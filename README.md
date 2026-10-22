@@ -1,5 +1,9 @@
 # Feishu Bitable MCP
 
+[English](README.en.md) | **简体中文** | [日本語](README.ja.md)
+
+> **版本说明：** 当前 v0.1.0 仅支持 Feishu 中国版。Lark 国际版使用独立 API 域名和应用凭据，尚未在本项目中实现或验证；不能仅修改名称就声称兼容。两者的品牌关系不代表凭证与数据跨区域互通。
+
 [![CI](https://github.com/a2681220474-glitch/feishu-bitable-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/a2681220474-glitch/feishu-bitable-mcp/actions/workflows/ci.yml)
 
 通过飞书多维表格 URL 读取 Base 信息、字段结构和原始记录的轻量 Python MCP 服务。
