@@ -25,6 +25,11 @@ dev = ["pytest>=9.0.3,<10", "pytest-asyncio>=1,<2", "ruff>=0.14,<1", "build>=1,<
 [project.scripts]
 feishu-bitable-mcp = "feishu_bitable_mcp.server:main"
 
+[project.urls]
+Repository = "https://github.com/a2681220474-glitch/feishu-bitable-mcp"
+Issues = "https://github.com/a2681220474-glitch/feishu-bitable-mcp/issues"
+Changelog = "https://github.com/a2681220474-glitch/feishu-bitable-mcp/blob/main/CHANGELOG.md"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

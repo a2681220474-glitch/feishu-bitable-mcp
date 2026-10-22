@@ -1,9 +1,11 @@
 # Feishu Bitable MCP
 
+[![CI](https://github.com/a2681220474-glitch/feishu-bitable-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/a2681220474-glitch/feishu-bitable-mcp/actions/workflows/ci.yml)
+
 通过飞书多维表格 URL 读取 Base 信息、字段结构和原始记录的轻量 Python MCP 服务。
 默认只读；可选开启有表白名单和字段校验的单条记录创建。
 
-这是社区项目，与飞书、Lark 或 OpenAI 没有官方隶属关系。当前是 `0.1.0` 开源候选版。
+这是社区项目，与飞书、Lark 或 OpenAI 没有官方隶属关系。首个公开版本为 `v0.1.0`，功能成熟度仍属早期。
 原型曾在 ChatGPT 网页端完成读取及固定测试表创建；本版重新实现后以 Mock 自动化测试验证，
 没有对真实飞书表执行集成读写，也没有验证当前 ChatGPT 网页端的认证流程。
 
@@ -50,7 +52,7 @@ cp .env.example .env
 ```
 
 Windows PowerShell 激活命令为 `.venv\Scripts\Activate.ps1`。
-仓库公开前，可直接在下载/解压后的目录从 `python3 -m venv .venv` 开始。
+也可下载发行源码，在解压后的目录从 `python3 -m venv .venv` 开始。
 
 仅在本地 `.env` 设置：
 
