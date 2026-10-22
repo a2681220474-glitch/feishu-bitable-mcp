@@ -13,6 +13,16 @@ A lightweight, self-hosted Python MCP server that lets compatible AI clients ins
 The original workflow was simple: give ChatGPT a Feishu Bitable link, let an authorized MCP integration read its structure and records, and analyze the data without exporting files first. The early private prototype successfully read a real Bitable table through ChatGPT and created one record in a fixed test table. This newly open-sourced implementation has been independently rewritten and tested using fictional data and mocked APIs; **live Feishu/ChatGPT integration has not yet been re-verified for v0.1.0**.
 
 ## MCP tools
+## Practical goal and implementation status
+
+**Original motivation:** Give ChatGPT a Feishu Bitable URL so an authorized MCP connection can inspect the table and read records for analysis, without repeatedly exporting spreadsheets or hand-writing Feishu API calls. This describes the intended workflow; ChatGPT web end-to-end compatibility has **not** been re-verified for v0.1.0.
+
+- **Available now (Feishu China):** Base metadata, field schemas, paginated record reads, table inspection, and an optional authenticated, allowlisted, field-validated single-record creation tool.
+- **Not implemented:** Editing existing records, creating tables, or editing ordinary Feishu cloud documents.
+- **Not supported:** Lark international tenants, domains, and app credentials. Their API environment requires separate implementation and validation.
+
+The new public release is validated with fictional data and mock API tests. The earlier **private prototype**, not v0.1.0, was tested against a real Feishu test table through ChatGPT.
+
 
 | Tool | What it does |
 | --- | --- |
