@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "feishu-bitable-mcp"
+version = "0.1.0"
+description = "A small, URL-driven Feishu Bitable MCP server with read-first tools and opt-in record creation."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = ["fastmcp==4.1.3", "httpx==0.28.1", "python-dotenv==1.2.2"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=9.0.3,<10", "pytest-asyncio>=1,<2", "ruff>=0.14,<1", "build>=1,<2"]
+
+[project.scripts]
+feishu-bitable-mcp = "feishu_bitable_mcp.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]

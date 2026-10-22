@@ -1,0 +1,7 @@
+include LICENSE
+include *.md
+include .env.example
+include requirements-dev.lock
+recursive-include examples *.py *.json
+recursive-include tests *.py
+global-exclude *.py[cod]

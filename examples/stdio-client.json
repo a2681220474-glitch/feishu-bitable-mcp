@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "feishu-bitable": {
+      "command": "/absolute/path/to/feishu-bitable-mcp/.venv/bin/feishu-bitable-mcp",
+      "args": ["--transport", "stdio"],
+      "env": {
+        "FEISHU_APP_ID": "<your-app-id>",
+        "FEISHU_APP_SECRET": "<your-app-secret>"
+      }
+    }
+  }
+}
