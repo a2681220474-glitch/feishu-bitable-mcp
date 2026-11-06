@@ -134,6 +134,54 @@ def test_unknown_and_non_string_field_names_are_rejected(fields):
         validate_fields(fields, SCHEMA)
 
 
+@pytest.mark.parametrize(
+    "name,value,expected",
+    [
+        ("Title", 42, "text"),
+        ("Amount", "fictional-private-value", "number"),
+        ("Done", "fictional-private-value", "boolean"),
+        ("When", "fictional-private-value", "milliseconds"),
+        ("Stage", "fictional-private-value", "configured option"),
+        ("Tags", ["fictional-private-value"], "configured option"),
+        ("Website", {"link": "fictional-private-value"}, "text and link"),
+    ],
+)
+def test_invalid_field_error_identifies_name_and_expectation_without_value(name, value, expected):
+    with pytest.raises(BitableError) as error:
+        validate_fields({name: value}, SCHEMA)
+    message = str(error.value)
+    assert name in message
+    assert expected in message.lower()
+    assert "fictional-private-value" not in message
+
+
+def test_unknown_field_error_names_field_without_echoing_value():
+    with pytest.raises(BitableError) as error:
+        validate_fields({"MisspelledTitle": "fictional-private-value"}, SCHEMA)
+    assert "MisspelledTitle" in str(error.value)
+    assert "fictional-private-value" not in str(error.value)
+
+
+def test_unsupported_field_error_identifies_field_and_type():
+    with pytest.raises(BitableError) as error:
+        validate_fields(
+            {"Calculated": "fictional-private-value"},
+            [{"field_name": "Calculated", "type": 20}],
+        )
+    assert "Calculated" in str(error.value)
+    assert "20" in str(error.value)
+    assert "fictional-private-value" not in str(error.value)
+
+
+def test_field_name_in_error_is_bounded_and_control_characters_are_escaped():
+    name = "Unsafe\n\r\t" + "x" * 500
+    with pytest.raises(BitableError) as error:
+        validate_fields({name: "fictional-private-value"}, SCHEMA)
+    message = str(error.value)
+    assert "\n" not in message and "\r" not in message and "\t" not in message
+    assert len(message) < 300
+
+
 @pytest.mark.parametrize("fields", [{}, [], None, {f"Synthetic-{i}": "value" for i in range(101)}])
 def test_empty_non_dict_and_excessive_field_counts_are_rejected(fields):
     with pytest.raises(BitableError, match="between 1 and 100"):
