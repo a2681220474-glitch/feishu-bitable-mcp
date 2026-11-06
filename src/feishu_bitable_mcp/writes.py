@@ -9,6 +9,22 @@ from urllib.parse import urlsplit
 
 from .config import BitableError
 
+EXPECTATIONS = {
+    1: "text of at most 5000 characters",
+    13: "phone text of at most 5000 characters",
+    2: "a finite number (not a boolean)",
+    7: "a boolean",
+    5: "Unix milliseconds between 0 and 253402300799999",
+    3: "one existing configured option name",
+    4: "a list of unique existing configured option names (at most 100)",
+    15: "an object with text and link strings, using an HTTP(S) link without credentials",
+}
+
+
+def _field_label(name: str) -> str:
+    """Bound and escape a field name; never include the submitted field value."""
+    return json.dumps(name[:120] + ("..." if len(name) > 120 else ""), ensure_ascii=False)
+
 
 def validate_fields(values: dict[str, Any], schema: list[dict[str, Any]]) -> dict[str, Any]:
     if not isinstance(values, dict) or not 1 <= len(values) <= 100:
@@ -22,8 +38,13 @@ def validate_fields(values: dict[str, Any], schema: list[dict[str, Any]]) -> dic
     by_name = {x.get("field_name"): x for x in schema}
     validated: dict[str, Any] = {}
     for name, value in values.items():
-        if not isinstance(name, str) or name not in by_name:
-            raise BitableError("Unknown field name. Call list_fields and use exact field names.")
+        if not isinstance(name, str):
+            raise BitableError("Unknown field name. Field names must be strings.")
+        label = _field_label(name)
+        if name not in by_name:
+            raise BitableError(
+                f"Unknown field name {label}. Call list_fields and use exact field names."
+            )
         raw = by_name[name]
         kind = raw.get("type")
         config = raw.get("property") or {}
@@ -69,13 +90,14 @@ def validate_fields(values: dict[str, Any], schema: list[dict[str, Any]]) -> dic
                 except ValueError:
                     valid = False
         else:
+            type_label = str(kind) if type(kind) is int else "unknown"
             raise BitableError(
-                "Field type is read-only or unsupported for creation. "
+                f"Field {label} (type={type_label}) is read-only or unsupported for creation. "
                 "Supported: text, phone, number, checkbox, date-time, static select and URL."
             )
         if not valid:
             raise BitableError(
-                "Field value does not match its live field type or configured options."
+                f"Field {label} (type={kind}) requires {EXPECTATIONS[kind]}."
             )
         validated[name] = value
     return validated

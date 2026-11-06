@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.1.1 — 2026-11-06
+
+- Redact credentials used by each in-flight request, including both attempts of a refreshed read, even when concurrent calls replace the cached tenant token. Credentials are retained only for that request, not in an accumulating token history.
+- Identify the offending field and expected value format in record-creation validation errors. Submitted values remain omitted; field names are bounded and control characters escaped.
+- Upgrade FastMCP to 4.1.5 and python-dotenv to 1.2.4, regenerating the hash lock with compatible existing dependency pins. FastMCP no longer pulls in the unused Keyring extras; this server's authentication remains unchanged.
+- Upgrade GitHub's checkout/setup-python Actions to v7 for hosted runners. Test hash-locked installation on Python 3.11–3.13 and independently resolved installation on Python 3.12, with `pip check` in each lane.
+- Run CI and public-advisory dependency auditing weekly as well as on pushes and pull requests.
+
+Validation: 216 mock-based tests, lint and `pip check` passed locally with both hash-locked and independently resolved dependencies. Wheel installation and stdio tool discovery passed. The lock's 70 applicable dependencies have no known vulnerabilities in the public-advisory scan. The added regression tests use fictional data and MockTransport. No real Feishu records are read or written during this maintenance. The limitations documented for v0.1.0 still apply: public-release live view/write semantics and ChatGPT web OAuth integration are not verified.
+
 ## 0.1.0 — 2026-10-22
 
 Initial public release, independently implemented from an earlier private prototype's generic requirements.

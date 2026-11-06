@@ -29,6 +29,31 @@ Live integration testing requires a separately authorized test Base. Do not use 
 
 Changes to record creation must preserve the explicit enable switch, operator write allowlist, field validation, and confirmation requirement. Do not add update, delete, batch writes, or arbitrary API/shell tools as incidental scope.
 
+## Dependency maintenance
+
+Review upstream release notes and Python/runner requirements before accepting a dependency PR. A passing dependency PR is not a substitute for reviewing its scope. Keep `pyproject.toml` and the hash lock in sync, including when Dependabot updates only the project metadata.
+
+Regenerate the lock with [uv](https://docs.astral.sh/uv/), which prefers its existing compatible pins:
+
+```sh
+uv pip compile pyproject.toml --extra dev --universal --generate-hashes \
+  --no-emit-index-url --index-url https://pypi.org/simple \
+  --output-file requirements-dev.lock
+```
+
+In a new virtual environment, validate the documented locked installation:
+
+```sh
+python -m pip install --require-hashes -r requirements-dev.lock
+python -m pip install --no-deps '.[dev]'
+python -m pip check
+pytest
+```
+
+CI repeats this on Python 3.11–3.13 and also resolves `.[dev]` independently on Python 3.12. Both paths must pass before merging. CI and a pinned-dependency advisory scan run each Monday at 03:17 UTC, as well as on push, pull request and manual dispatch. Audit failures need review; do not silence them automatically. Weekly checks use only public package metadata, never Feishu credentials or records.
+
+For a maintenance release, update both version declarations and the changelog, build distributions, test installation of the wheel, and record the actual CI results. Preserve the distinction between synthetic tests and separately authorized live verification.
+
 ## Licensing and security
 
 Submit only code and examples you have the right to contribute. Contributions are expected to be available under this project's MIT license; preserve attribution for any permitted third-party material.

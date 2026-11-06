@@ -2,7 +2,9 @@
 
 [English](README.en.md) | **简体中文** | [日本語](README.ja.md)
 
-> **版本说明：** 当前 v0.1.0 仅支持 Feishu 中国版。Lark 国际版使用独立 API 域名和应用凭据，尚未在本项目中实现或验证；不能仅修改名称就声称兼容。两者的品牌关系不代表凭证与数据跨区域互通。
+> **维护版 v0.1.1：** 修复并发 Token 刷新时的错误脱敏，改善字段校验提示，并同步依赖与哈希锁文件。CI 增加锁定安装、独立解析安装及每周依赖审计。详情见 [CHANGELOG](CHANGELOG.md)。
+>
+> **版本说明：** 当前仅支持 Feishu 中国版。Lark 国际版使用独立 API 域名和应用凭据，尚未在本项目中实现或验证；不能仅修改名称就声称兼容。两者的品牌关系不代表凭证与数据跨区域互通。
 
 [![CI](https://github.com/a2681220474-glitch/feishu-bitable-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/a2681220474-glitch/feishu-bitable-mcp/actions/workflows/ci.yml)
 
@@ -172,6 +174,7 @@ FEISHU_WRITE_TABLE_URLS=https://example.feishu.cn/base/DemoBaseToken0001?table=t
 - HTTP 请求有连接/总时长限制；字段和表列表有分页循环保护及页数上限。
 - 飞书错误包含 HTTP 状态、code、经脱敏的 msg；不返回原始 HTTP 响应体、凭证或请求头。
   日志中不记录输入字段和凭证。调试时也不要开启会记录鉴权头的外部代理日志。
+- 创建校验错误会指出字段名与预期格式，不回显提交值；字段名截断至 120 字符并转义控制字符。
 - 本项目只实现固定的 API 方法，不暴露任意 URL 请求、Raw API 或 shell 命令。
 
 ## 测试与构建
@@ -203,6 +206,9 @@ URL、分页、视图参数、鉴权、限流、token 刷新、错误脱敏和�
 python -m pip install --require-hashes -r requirements-dev.lock
 python -m pip install --no-deps .
 ```
+
+CI 同时验证哈希锁定安装和 `.[dev]` 独立解析安装，并运行 `pip check`。
+每周一另有定期验证和依赖漏洞审计；升级依赖时须同步更新锁文件，流程见 [CONTRIBUTING](CONTRIBUTING.md)。
 
 ## 与官方工具的关系
 

@@ -14,13 +14,13 @@ code provenance alone cannot determine employment or other contractual obligatio
 
 | Distribution | Tested version | License | Source |
 | --- | --- | --- | --- |
-| fastmcp | 4.1.3 | Apache-2.0 | https://github.com/PrefectHQ/fastmcp |
+| fastmcp | 4.1.5 | Apache-2.0 | https://github.com/PrefectHQ/fastmcp |
 | httpx | 0.28.1 | BSD-3-Clause | https://github.com/encode/httpx |
-| python-dotenv | 1.2.2 | BSD-3-Clause | https://github.com/theskumar/python-dotenv |
+| python-dotenv | 1.2.4 | BSD-3-Clause | https://github.com/theskumar/python-dotenv |
 
 ## Runtime dependency review
 
-The tested Python 3.12 environment resolves 69 runtime distributions, including
+The v0.1.1 hash-locked Python 3.12 environment resolves 64 runtime distributions, including
 the three direct dependencies. `requirements-dev.lock` pins the development and
 runtime environment with public PyPI hashes. Platform/Python-specific dependencies
 may differ; CI installs the package on Python 3.11–3.13.

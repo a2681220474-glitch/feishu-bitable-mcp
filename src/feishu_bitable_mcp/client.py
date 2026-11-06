@@ -61,9 +61,15 @@ class FeishuClient:
     async def close(self) -> None:
         await self._http.aclose()
 
-    def _safe_message(self, value: Any) -> str:
+    def _safe_message(self, value: Any, *, request_tokens: tuple[str, ...] = ()) -> str:
         message = value if isinstance(value, str) else "Unspecified upstream error"
-        for secret in (self.settings.app_secret, self.settings.auth_token, self._token):
+        secrets = {
+            self.settings.app_secret,
+            self.settings.auth_token,
+            self._token,
+            *request_tokens,
+        }
+        for secret in sorted(secrets, key=len, reverse=True):
             if secret:
                 message = message.replace(secret, "[redacted]")
         message = re.sub(r"(?i)Bearer\s+\S+", "Bearer [redacted]", message)
@@ -85,11 +91,18 @@ class FeishuClient:
             raise BitableError(f"{context}: HTTP {response.status_code}; invalid response object.")
         return payload
 
-    def _raise_api(self, response: httpx.Response, payload: dict[str, Any], context: str) -> None:
+    def _raise_api(
+        self,
+        response: httpx.Response,
+        payload: dict[str, Any],
+        context: str,
+        *,
+        request_tokens: tuple[str, ...] = (),
+    ) -> None:
         code = payload.get("code")
         if not response.is_success or code != 0:
             safe_code = code if type(code) is int else "unknown"
-            msg = self._safe_message(payload.get("msg"))
+            msg = self._safe_message(payload.get("msg"), request_tokens=request_tokens)
             raise BitableError(
                 f"{context}: HTTP {response.status_code}; code={safe_code}; msg={msg}"
             )
@@ -154,6 +167,9 @@ class FeishuClient:
 
     async def request(self, method: str, route: str, **kwargs: Any) -> dict[str, Any]:
         used_token = await self.token()
+        # Keep only this call's credentials, including its one optional read retry.
+        # Other requests may replace the cached token before this response arrives.
+        request_tokens = (used_token,)
         context = "Feishu record creation failed" if method == "POST" else "Feishu read failed"
         response = await self._send(
             method, route, headers={"Authorization": f"Bearer {used_token}"}, **kwargs
@@ -171,13 +187,14 @@ class FeishuClient:
                 if self._token == used_token:
                     self._expires = 0.0
             used_token = await self.token()
+            request_tokens += (used_token,)
             response = await self._send(
                 method, route, headers={"Authorization": f"Bearer {used_token}"}, **kwargs
             )
             payload = self._payload(response, context)
         if method == "POST" and response.status_code >= 500:
             context += "; write outcome may be unknown; inspect records before retrying"
-        self._raise_api(response, payload, context)
+        self._raise_api(response, payload, context, request_tokens=request_tokens)
         data = payload.get("data")
         if not isinstance(data, dict):
             detail = (

@@ -281,6 +281,76 @@ async def test_error_messages_redact_secrets_and_preserve_useful_code(mock_clien
         assert secret not in rendered
 
 
+@pytest.mark.parametrize("method", ["GET", "POST"])
+async def test_inflight_error_redacts_its_token_after_concurrent_refresh(mock_client, method):
+    old_request_started = asyncio.Event()
+    refresh_completed = asyncio.Event()
+    token_calls = 0
+    slow_calls = 0
+    old_token = "fictional-inflight-credential-one"
+    new_token = "fictional-refreshed-credential-two"
+
+    async def handler(request):
+        nonlocal token_calls, slow_calls
+        if is_token(request):
+            token_calls += 1
+            return token_response(old_token if token_calls == 1 else new_token)
+        if request.url.path.endswith("/slow"):
+            slow_calls += 1
+            assert request.headers["authorization"] == f"Bearer {old_token}"
+            old_request_started.set()
+            await refresh_completed.wait()
+            return httpx.Response(
+                403, json={"code": 1254302, "msg": f"Rejected credential {old_token}"}
+            )
+        if request.headers["authorization"] == f"Bearer {old_token}":
+            return httpx.Response(200, json={"code": 99991668, "msg": "Expired"})
+        refresh_completed.set()
+        return success({})
+
+    client, _ = mock_client(handler)
+    async with asyncio.TaskGroup() as group:
+        async def delayed_request():
+            with pytest.raises(BitableError) as error:
+                await client.request(method, "/slow")
+            return str(error.value)
+
+        pending = group.create_task(delayed_request())
+        await old_request_started.wait()
+        await client.request("GET", "/trigger-refresh")
+    rendered = pending.result()
+    assert "code=1254302" in rendered
+    assert "[redacted]" in rendered
+    assert old_token not in rendered
+    assert new_token not in rendered
+    assert token_calls == 2
+    assert slow_calls == 1
+
+
+async def test_retried_read_redacts_both_attempt_tokens(mock_client):
+    old_token = "fictional-before-refresh"
+    new_token = "fictional-after-refresh"
+    tokens = 0
+
+    def handler(request):
+        nonlocal tokens
+        if is_token(request):
+            tokens += 1
+            return token_response(old_token if tokens == 1 else new_token)
+        if request.headers["authorization"] == f"Bearer {old_token}":
+            return httpx.Response(200, json={"code": 99991668, "msg": "Expired"})
+        return httpx.Response(
+            403, json={"code": 1254302, "msg": f"Rejected {old_token} and {new_token}"}
+        )
+
+    client, _ = mock_client(handler)
+    with pytest.raises(BitableError) as error:
+        await client.request("GET", RECORDS_ROUTE)
+    assert old_token not in str(error.value)
+    assert new_token not in str(error.value)
+    assert str(error.value).count("[redacted]") == 2
+
+
 @pytest.mark.parametrize("expiry", [0, -1, True, "7200", None])
 async def test_invalid_auth_response_expiry_is_not_cached(mock_client, expiry):
     client, _ = mock_client(lambda request: token_response(expiry=expiry))
