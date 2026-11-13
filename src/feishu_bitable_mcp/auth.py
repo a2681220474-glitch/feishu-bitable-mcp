@@ -1,7 +1,6 @@
 """Caller authentication for an operator-controlled, single-owner deployment.
 
-This verifier is not an OAuth authorization server. Interactive clients that
-require OAuth discovery need an authenticating OAuth gateway in front of it.
+Feishu personal OAuth or an operator-controlled app-mode Bearer verifier.
 Feishu credentials authenticate the upstream application, not the MCP caller.
 """
 
@@ -11,6 +10,8 @@ import hashlib
 import hmac
 
 from fastmcp.server.auth import AccessToken, AuthProvider, TokenVerifier
+
+from .config import Settings
 
 
 class SingleOwnerTokenVerifier(TokenVerifier):
@@ -45,3 +46,13 @@ class SingleOwnerTokenVerifier(TokenVerifier):
 def build_auth(token: str) -> AuthProvider | None:
     """Build optional caller auth; the CLI separately enforces safe host binding."""
     return SingleOwnerTokenVerifier(token) if token else None
+
+
+
+def configured_auth(settings: Settings, *, oauth_storage=None) -> AuthProvider | None:
+    """Use personal Feishu login or the existing app-mode Bearer verifier."""
+    if settings.identity == "user":
+        from .user_auth import FeishuProvider
+
+        return FeishuProvider(settings, client_storage=oauth_storage)
+    return build_auth(settings.auth_token)

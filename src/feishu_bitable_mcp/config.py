@@ -82,17 +82,67 @@ class Settings:
     enable_writes: bool = False
     read_tables: frozenset[tuple[str, str]] = frozenset()
     write_tables: frozenset[tuple[str, str]] = frozenset()
+    public_url: str = ""
+    identity: str = "app"
+    user_scopes: tuple[str, ...] = (
+        "bitable:app:readonly", "docx:document:readonly", "sheets:spreadsheet:readonly",
+        "drive:drive:readonly", "wiki:wiki:readonly", "offline_access",
+    )
+    resource_urls: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.app_id or not self.app_secret:
             raise BitableError("Set FEISHU_APP_ID and FEISHU_APP_SECRET in your local .env.")
-        if self.auth_token and len(self.auth_token) < 32:
-            raise BitableError("MCP_AUTH_TOKEN must contain at least 32 characters.")
+        if self.identity not in {"app", "user"}:
+            raise BitableError("FEISHU_AUTH_MODE must be app or user.")
+        if self.identity == "user":
+            if (
+                not self.public_url or self.auth_token or self.enable_writes
+            ):
+                raise BitableError(
+                    "User mode requires MCP_PUBLIC_URL and read-only operation; "
+                    "leave other MCP authentication settings empty."
+                )
+            allowed = set(type(self).__dataclass_fields__["user_scopes"].default)
+            if not self.user_scopes or not set(self.user_scopes) <= allowed:
+                raise BitableError("FEISHU_USER_SCOPES must use the documented read-only scopes.")
+        if self.resource_urls:
+            from .resources import Resource
+
+            for url in self.resource_urls:
+                Resource.parse(url)
+        if self.auth_token and (
+            len(self.auth_token) < 32 or any(c.isspace() for c in self.auth_token)
+        ):
+            raise BitableError("MCP_AUTH_TOKEN needs at least 32 characters without whitespace.")
         if self.enable_writes and (not self.auth_token or not self.write_tables):
             raise BitableError("Writes require MCP_AUTH_TOKEN and exact FEISHU_WRITE_TABLE_URLS.")
+        if self.public_url:
+            try:
+                parts = urlsplit(self.public_url)
+                valid = (
+                    parts.scheme == "https" and bool(parts.hostname)
+                    and parts.username is None and parts.password is None
+                    and parts.port is None and not parts.query and not parts.fragment
+                    and not any(c.isspace() or ord(c) < 32 for c in self.public_url)
+                    and "\\" not in self.public_url and parts.path == "/mcp"
+                )
+            except ValueError:
+                valid = False
+            if not valid:
+                raise BitableError("MCP_PUBLIC_URL must be a complete HTTPS /mcp URL.")
 
     @classmethod
     def from_env(cls) -> Settings:
+        unsupported = (
+            "MCP_GITHUB_CLIENT_ID", "MCP_GITHUB_CLIENT_SECRET", "MCP_GITHUB_ALLOWED_USER_IDS",
+            "MCP_OAUTH_ISSUER", "MCP_OAUTH_JWKS_URL",
+        )
+        if any(os.getenv(key, "").strip() for key in unsupported):
+            raise BitableError(
+                "Unsupported login settings. Use FEISHU_AUTH_MODE=user for Feishu login, "
+                "or app mode with MCP_AUTH_TOKEN."
+            )
         flag = os.getenv("FEISHU_ENABLE_WRITES", "false").lower().strip()
         if flag not in {"true", "false"}:
             raise BitableError("FEISHU_ENABLE_WRITES must be true or false.")
@@ -103,6 +153,15 @@ class Settings:
             enable_writes=flag == "true",
             read_tables=_targets("FEISHU_READ_TABLE_URLS"),
             write_tables=_targets("FEISHU_WRITE_TABLE_URLS"),
+            public_url=os.getenv("MCP_PUBLIC_URL", "").strip(),
+            identity=os.getenv("FEISHU_AUTH_MODE", "app").strip().lower(),
+            user_scopes=tuple(os.getenv(
+                "FEISHU_USER_SCOPES", " ".join(cls.__dataclass_fields__["user_scopes"].default)
+            ).split()),
+            resource_urls=tuple(
+                url.strip() for url in os.getenv("FEISHU_READ_RESOURCE_URLS", "").split(",")
+                if url.strip()
+            ),
         )
 
     def authorize(self, target: Target, *, write: bool = False) -> None:

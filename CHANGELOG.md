@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.0 development candidate — unreleased
+
+- Add Feishu personal OAuth via the SDK proxy, with consent, PKCE, encrypted state,
+  refresh and reauthorization. Per-request user credentials never fall back to app identity.
+- Add --setup with hidden secret input and exclusive private config creation; preserve
+  --env-file, --doctor, existing application mode and opt-in guarded record creation.
+- Add read_document, get_spreadsheet_info, read_spreadsheet, read_excel_file and
+  resolve_resource for docx, online Sheets, uploaded .xlsx and Wiki resolution.
+- Preserve raw document blocks and record pages, use explicit cell windows and Excel row
+  cursors, reject oversized/encrypted/macro workbooks, and never execute formulas.
+- Add safe read transport retries, concurrency and attempt deadlines, FastMCP 4.1.6 with
+  a synchronized hash lock, and macOS/Windows onboarding CI.
+- Update three-language readmes and deployment/authentication guidance.
+
+Validation uses synthetic data, including the complete OAuth flow, refresh, revocation,
+concurrent user isolation, new read tools and workbook parsing. Real Feishu/ChatGPT
+browser acceptance is pending. No real resource is created or modified during development.
+
 ## 0.1.1 — 2026-11-06
 
 - Redact credentials used by each in-flight request, including both attempts of a refreshed read, even when concurrent calls replace the cached tenant token. Credentials are retained only for that request, not in an accumulating token history.
