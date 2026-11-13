@@ -16,6 +16,7 @@ def isolated_cli(monkeypatch, tmp_path):
         "FEISHU_READ_TABLE_URLS", "FEISHU_WRITE_TABLE_URLS", "MCP_OAUTH_ISSUER",
         "MCP_OAUTH_JWKS_URL", "MCP_PUBLIC_URL", "MCP_HOST", "MCP_PORT",
         "MCP_GITHUB_CLIENT_ID", "MCP_GITHUB_CLIENT_SECRET", "MCP_GITHUB_ALLOWED_USER_IDS",
+        "FEISHU_AUTH_MODE", "FEISHU_USER_SCOPES", "FEISHU_READ_RESOURCE_URLS",
     ]:
         monkeypatch.delenv(key, raising=False)
     return monkeypatch, tmp_path
@@ -70,3 +71,26 @@ def test_doctor_without_url_never_calls_feishu(isolated_cli, capsys):
         server.main()
     assert error.value.code == 0
     assert '"live_reads": false' in capsys.readouterr().out
+
+
+def test_public_url_does_not_replace_bearer_auth_in_app_mode(isolated_cli, capsys):
+    patch, _ = isolated_cli
+    patch.setenv("FEISHU_APP_ID", "fictional-app")
+    patch.setenv("FEISHU_APP_SECRET", "fictional-secret")
+    patch.setenv("MCP_PUBLIC_URL", "https://mcp.example.com/mcp")
+    patch.setattr(sys, "argv", ["mcp", "--host", "0.0.0.0"])
+    with pytest.raises(SystemExit):
+        server.main()
+    assert "requires MCP_AUTH_TOKEN" in capsys.readouterr().err
+
+
+def test_user_mode_explains_stdio_limitation_before_starting(isolated_cli, capsys):
+    patch, _ = isolated_cli
+    patch.setenv("FEISHU_APP_ID", "fictional-app")
+    patch.setenv("FEISHU_APP_SECRET", "fictional-secret")
+    patch.setenv("FEISHU_AUTH_MODE", "user")
+    patch.setenv("MCP_PUBLIC_URL", "https://mcp.example.com/mcp")
+    patch.setattr(sys, "argv", ["mcp", "--transport", "stdio"])
+    with pytest.raises(SystemExit):
+        server.main()
+    assert "requires HTTP OAuth" in capsys.readouterr().err

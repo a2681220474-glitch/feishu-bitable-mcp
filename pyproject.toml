@@ -4,12 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "feishu-bitable-mcp"
-version = "0.1.2.dev0"
-description = "A small, URL-driven Feishu Bitable MCP server with read-first tools and opt-in record creation."
+version = "0.2.0rc1"
+description = "Self-hosted Feishu MCP for Bitable, documents, spreadsheets and uploaded Excel files."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
-dependencies = ["fastmcp==4.1.6", "httpx==0.28.1", "python-dotenv==1.2.4"]
+dependencies = [
+  "fastmcp==4.1.6", "httpx==0.28.1", "python-dotenv==1.2.4",
+  "openpyxl==3.1.5", "defusedxml==0.7.1",
+]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Programming Language :: Python :: 3",

@@ -70,7 +70,6 @@ class FeishuClient:
         secrets = {
             self.settings.app_secret,
             self.settings.auth_token,
-            self.settings.github_client_secret,
             self._token,
             *request_tokens,
         }
@@ -161,6 +160,13 @@ class FeishuClient:
         raise AssertionError("unreachable")
 
     async def token(self) -> str:
+        if self.settings.identity == "user":
+            from fastmcp.server.dependencies import get_access_token
+
+            access = get_access_token()
+            if access is None or not access.token or access.token == "<redacted>":
+                raise BitableError("Sign in to Feishu through this MCP connection first.")
+            return access.token
         async with self._token_lock:
             if self._token and time.monotonic() < self._expires:
                 return self._token
@@ -202,6 +208,10 @@ class FeishuClient:
                 ) from None
             raise
         if method == "GET" and payload.get("code") in EXPIRED_TOKEN_CODES:
+            if self.settings.identity == "user":
+                raise BitableError(
+                    "Feishu user authorization expired. Reconnect and sign in again."
+                )
             async with self._token_lock:
                 if self._token == used_token:
                     self._expires = 0.0

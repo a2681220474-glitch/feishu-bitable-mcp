@@ -1,62 +1,17 @@
-# ChatGPT 网页端接入（外部 OAuth）
+# ChatGPT 与飞书本人授权
 
-请先阅读 [使用方式与授权边界](user-access.md)。本页介绍部署者可选的 MCP 访问控制配置，
-不提供飞书个人数据授权。已有身份服务的部署者可参考本页，
-需要 GitHub 身份控制的部署者可参考 [配置说明](github-login.md)。
+推荐流程见 [首次接入指南](setup.md)。使用者配置自己的飞书自建应用和 HTTPS 服务，在 ChatGPT 添加自己的 `/mcp` URL 并选择 OAuth，然后在飞书登录并同意读取。
 
-本分支提供 OAuth **资源服务器**能力：公布受保护资源元数据，并验证外部身份服务签发的 RS256 JWT。授权码、登录页面、用户同意、刷新令牌由你的身份服务处理。本项目不保管用户 refresh token，不把 MCP 登录转换成飞书个人身份；上游仍使用自建应用身份。
+底层使用 FastMCP OAuthProxy：客户端发现和注册、同意页面、PKCE、授权码交换、加密持久化和刷新由 SDK 处理；本项目适配飞书 JSON token 端点及用户信息验证。原始飞书令牌只在服务端使用。
 
-当前已用虚构密钥/令牌验证本地协议及拒绝边界；**尚未完成真实身份服务与 ChatGPT 浏览器授权验收**。下列是配置和验收步骤，不能视为已验证的即插即用部署方案。
+服务应完整转发 `/.well-known/*`、`/authorize`、`/token`、`/register`、同意页面和 `/auth/callback`，以及 `/mcp`。只转发 `/mcp` 会使登录失败。
 
-## 前提与身份服务
+飞书应用的回调填写自己服务的 `/auth/callback`。ChatGPT 客户端回调由 SDK 处理，并限制在 ChatGPT 域名，不能把两个回调地址混淆。
 
-使用一个符合 [OpenAI OAuth 要求](https://developers.openai.com/plugins/build/auth)的成熟身份服务：支持授权码 + PKCE S256、OAuth 元数据、ChatGPT 支持的客户端注册方式（CIMD、DCR 或预注册客户端），并为你的 MCP 资源签发访问 token。
+自动刷新失效、用户撤销或企业策略变化时，在 ChatGPT 重新连接并登录；代码不会改用应用身份读取。用户模式的工具全部只读，实际数据范围由飞书权限控制。
 
-本集成只接受 RS256 JWT，要求：有效签名、`iss` 与配置完全相同、`aud` 包含 MCP 完整公网 `/mcp` URL、有效 `exp`、非空 `sub`、`read` scope，以及满足可选 `nbf`。**不能把 Google ID token、飞书 tenant token 或任意其他受众的 token 当作 MCP access token。**
+## 验证与限制
 
-在身份服务端把登录和资源授权限制为维护者/明确允许的用户；若允许公开注册并自动授予 `read`，这些人会获得同一飞书应用及服务白名单允许的资源访问能力。此版本不提供逐用户飞书权限隔离，推荐每位使用者各自部署。
+模拟测试覆盖完整客户端授权、同意、PKCE、MCP 读取、刷新、撤销后拒绝和并发身份隔离。真实飞书/ChatGPT 浏览器验收待完成。仅服务启动或 doctor 配置检查通过，不能视为真实授权成功。
 
-## 配置
-
-以下域名都是虚构样例，替换为自己身份服务控制台的真实配置：
-
-```dotenv
-FEISHU_APP_ID=<your-app-id>
-FEISHU_APP_SECRET=<your-app-secret>
-FEISHU_ENABLE_WRITES=false
-FEISHU_READ_TABLE_URLS=<authorized-test-table-url>
-MCP_AUTH_TOKEN=
-MCP_OAUTH_ISSUER=https://identity.example.com/
-MCP_OAUTH_JWKS_URL=https://identity.example.com/.well-known/jwks.json
-MCP_PUBLIC_URL=https://mcp.example.com/mcp
-```
-
-issuer 的结尾斜杠须和 JWT `iss` 保持一致。JWKS 地址必须来自你的身份服务；设置不会由 MCP 客户端参数改变。JWT audience 固定为 `MCP_PUBLIC_URL`，无需额外配置。这个 OAuth 模式保持只读，不能与静态 MCP_AUTH_TOKEN 或可选写入混用。
-
-```bash
-feishu-bitable-mcp --env-file /absolute/path/to/.env --doctor
-feishu-bitable-mcp --env-file /absolute/path/to/.env --doctor --url '<test-table-url>'
-feishu-bitable-mcp --env-file /absolute/path/to/.env
-```
-
-把自己的 HTTPS 反向代理转发到 `127.0.0.1:8000`，保留 `/mcp`、`/.well-known/oauth-protected-resource/mcp` 路径及 Authorization 头。已有正常 tunnel 无需重建；临时域名变化后需要同时更新 public URL、身份服务 audience 和 ChatGPT 连接配置。
-
-## 检查与连接
-
-```bash
-curl https://mcp.example.com/.well-known/oauth-protected-resource/mcp
-```
-
-应返回 `resource=https://mcp.example.com/mcp`、配置的 `authorization_servers` 与 `scopes_supported`。未带有效凭证访问 `/mcp` 应返回 401，WWW-Authenticate 头指向上述 metadata。
-
-在 ChatGPT 的自定义 MCP 创建入口填写完整 `https://mcp.example.com/mcp`，选择 OAuth。按身份服务支持方式配置客户端；需要预注册时，将 ChatGPT 管理页面显示的**准确回调地址**加入身份服务 allowlist，不能凭旧教程猜测。亲自完成浏览器登录和同意后，刷新工具，确认只出现四个读取工具。
-
-首次只给测试表 URL，调用 inspect_table；然后用 list_records 验证分页和视图范围。身份服务、ChatGPT 权限或验证码需要使用者本人处理。
-
-## 发布前仍需真人验收
-
-- 从另一账号/浏览器按文档配置，完成登录、工具发现、一次真实测试表读取。
-- 撤销授权、访问令牌过期和重新授权可正常处理；检查拒绝未允许用户。
-- 验证真实视图筛选/排序和跨页结果，而非只确认 MCP 握手成功。
-
-依据：[OpenAI Authentication](https://developers.openai.com/plugins/build/auth)、[FastMCP Remote OAuth](https://gofastmcp.com/servers/auth/remote-oauth)。使用不支持上述注册方式或无法签发对应 JWT 的身份服务时，需要适配层，不能只填写这三个 URL 就保证兼容。
+参考：[OpenAI Authentication](https://developers.openai.com/plugins/build/auth)、[FastMCP OAuth Proxy](https://gofastmcp.com/servers/auth/oauth-proxy)、[飞书用户凭证](https://open.feishu.cn/document/authentication-management/access-token/get-user-access-token)。

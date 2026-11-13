@@ -13,6 +13,15 @@ from .config import BitableError, Settings, Target
 async def diagnose(settings: Settings, url: str | None, api: FeishuClient) -> dict[str, Any]:
     checks: list[dict[str, Any]] = [{"step": "configuration", "ok": True}]
     result: dict[str, Any] = {"ok": True, "checks": checks, "live_reads": bool(url)}
+    if settings.identity == "user":
+        result["live_reads"] = False
+        result["next_step"] = (
+            "Start the server, add its HTTPS /mcp URL to ChatGPT with OAuth, "
+            "sign in to Feishu, then call a read tool. "
+            "CLI diagnostics cannot use a browser session."
+        )
+        checks.append({"step": "user_login", "status": "requires_authenticated_MCP_call"})
+        return result
     if not url:
         result["next_step"] = "Run --doctor --url <test-table-url> to test Feishu access."
         return result

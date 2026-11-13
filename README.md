@@ -2,30 +2,26 @@
 
 [English](README.en.md) | **简体中文** | [日本語](README.ja.md)
 
-> **维护版 v0.1.1：** 修复并发 Token 刷新时的错误脱敏，改善字段校验提示，并同步依赖与哈希锁文件。CI 增加锁定安装、独立解析安装及每周依赖审计。详情见 [CHANGELOG](CHANGELOG.md)。
+> **开发候选 v0.2.0rc1：** 飞书个人授权、云文档、在线电子表格及云盘 Excel 读取。模拟授权与读取测试已通过；真实飞书和 ChatGPT 浏览器验收仍待进行。已发布 v0.1.1 不包含这些新增能力。
 >
 > **版本说明：** 当前仅支持 Feishu 中国版。Lark 国际版使用独立 API 域名和应用凭据，尚未在本项目中实现或验证；不能仅修改名称就声称兼容。两者的品牌关系不代表凭证与数据跨区域互通。
 
 [![CI](https://github.com/a2681220474-glitch/feishu-bitable-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/a2681220474-glitch/feishu-bitable-mcp/actions/workflows/ci.yml)
 
-通过飞书多维表格 URL 读取 Base 信息、字段结构和原始记录的轻量 Python MCP 服务。
+通过飞书链接读取多维表格、云文档、在线电子表格和云盘 `.xlsx` 的轻量 Python MCP 服务。
 默认只读；可选开启有表白名单和字段校验的单条记录创建。
 
 ## 开源使用与配置
 
-任何人都可按 MIT 许可证获取代码并自行部署，使用自己配置的飞书应用与数据，无需项目维护者批准。
-当前版本使用**飞书应用身份**：使用者需要配置自己的企业自建应用、API 权限及目标 Base 资源授权，
-启动服务并提供 ChatGPT 可访问的 HTTPS `/mcp` 地址。仅下载代码或只在 ChatGPT 中填写配置，不会自动托管服务。
+每人独立部署、配置自己的飞书应用和 HTTPS 服务，在 ChatGPT 添加 `/mcp` 并选择 OAuth，完成飞书本人登录授权后读取数据。无需项目维护者批准，也无需 OpenAI API Key。
 
-“通过自己的飞书账号授权，让工具读取自己有权访问的表格”需要**飞书用户身份授权**，
-还须满足应用权限、用户同意及企业策略；本项目当前尚未实现这条链路。
-详见 [使用方式与授权边界](docs/user-access.md)。
+用户模式使用各自的飞书权限，受应用 scope、用户同意与企业策略约束。代理支持刷新；失效时可重新登录。详见 [首次接入指南](docs/setup.md)和[授权边界](docs/user-access.md)。
 
 ## 项目初衷与功能边界
 
 这个项目源于一个真实的使用场景：**把飞书多维表格链接直接发给 ChatGPT，让获得授权的 MCP 工具读取表结构与记录，辅助分析数据，而不必反复导出 Excel 或手工调用飞书 API。** 这是项目的目标场景，不意味着 v0.1.0 已重新完成 ChatGPT 网页端到端兼容性验证。
 
-- **当前已实现（Feishu 中国版）：** 读取表信息、字段结构、分页记录和表结构样本；按配置启用受鉴权、表白名单与字段校验保护的单条记录创建。
+- **当前已实现（Feishu 中国版）：** 读取表信息、字段结构、分页记录、文档块、工作表与单元格、云盘 Excel。用户模式只读；应用身份模式可按既有保护启用单条记录创建。
 - **尚未实现：** 修改已有记录、创建数据表、编辑普通飞书云文档。
 - **Lark 国际版尚不支持：** 当前仅使用 `open.feishu.cn` API 与 `*.feishu.cn` Base 链接，不接受国际版域名或凭据。国际版需独立实现并验证后才能声明支持。
 
@@ -43,10 +39,14 @@
 | `list_fields` | `url` | 读取全部字段页，保留原始属性，增加可读类型名 |
 | `list_records` | `url, page_size=100, page_token=None` | 返回一页原始记录和下一页标记；页大小 1–500 |
 | `inspect_table` | `url, sample_size=10` | 表信息、完整字段结构、主字段、API 总数和首批原始样本 |
+| `resolve_resource` | `url` | 识别文档/表格/文件，解析 Wiki 指向的真实类型 |
+| `read_document` | `url, page_size=100, page_token=None` | 分页原始 docx 块，保留文本、样式及树关系 |
+| `get_spreadsheet_info` | `url` | 电子表格信息和全部工作表 ID/属性 |
+| `read_spreadsheet` | `url, range="A1:T100", sheet_id=None, render="ToString"` | 每次最多 5000 单元格；Formula 模式读取公式 |
+| `read_excel_file` | `url, sheet=None, start_row=1, rows=100, start_column=1, columns=20, data_only=false` | 云盘 .xlsx 的工作表、值/类型/数字格式与行游标 |
 | `create_record` | `url, fields, confirm=false` | 默认不注册；配置允许后创建一条记录 |
 
-- 只接受 `https://*.feishu.cn/base/<app_token>?table=<table_id>`；`view` 可选。
-  不支持 Wiki、短链接、BaseApp 或国际版 Lark 域名。
+- Base 工具接受 `https://*.feishu.cn/base/<app_token>?table=<table_id>`，`view` 可选。新增工具接受 `/docx/`、`/sheets/`、`/file/`、`/drive/file/` 和指向相应资源的 `/wiki/` 链接。Wiki Base 可先解析类型与 token，再使用带 table 的标准 Base URL。不支持短链接、BaseApp 和 Lark 国际版。
 - 服务只从 URL 提取 ID，API 请求目的地固定为 `open.feishu.cn`。
 - 读取指定视图时转发 `view_id`。实际筛选、排序和可见字段行为取决于飞书 API，
   这里仅有参数转发测试，不能将视图当成权限隔离边界。`total` 保留上游含义，未保证是视图筛选后的数量。
@@ -54,8 +54,10 @@
   `inspect_table` 的首批记录不是统计抽样。
 - 单次记录调用只返回一页。调用方应在 `has_more=true` 时继续传 `page_token`；不会静默只取最后一页。
 - 字段中公式、查找引用、关联目标、选项等配置按飞书返回原样保留。上游未提供的配置不会推断。
-- 仅支持企业自建应用的 `tenant_access_token`；没有 CLI、用户 OAuth 或数据库依赖。
-  应用只能访问其已授权资源；这些身份不等于最终用户本人的权限。
+- 用户模式通过飞书 OAuth 获得每个请求所属用户的凭证；兼容应用身份模式。两种身份不混用；无需安装 CLI。OAuth 状态采用 SDK 加密存储。
+- 文档按 page_token 续读；嵌入图片、附件、画板等保留引用，不自动下载或渲染。
+- 在线表格按显式矩形窗口读取，不声称已获取整个工作簿或完整样式。
+- 云盘 Excel 限普通 .xlsx：下载 20 MiB、展开 100 MiB、窗口 5000 单元格；不执行公式/宏。data_only 读取已保存缓存，可能缺失或过期；不支持 .xls、宏工作簿、加密文件或本机路径。
 - 没有更新、删除、批量写入、建表或修改字段工具。
 
 以下 URL、字段和记录均为虚构示例，不能用于真实 API 调用：
@@ -64,109 +66,36 @@
 https://example.feishu.cn/base/DemoBaseToken0001?table=tblDemoTable01&view=vewDemoView1
 ```
 
-## 安装与本地启动
+## 安装与启动
 
-首次配置按 [配置与自检指南](docs/setup.md)完成，并先阅读 [使用方式与授权边界](docs/user-access.md)。
-当前开发分支的可选 MCP 访问鉴权见 [高级 OAuth 配置](docs/chatgpt.md)，
-其真实 ChatGPT 浏览器授权仍待验证；已发布 v0.1.1 不包含这项新增能力。
-
-需要 Python 3.11+。已配置 Python 3.11–3.13 CI；本地实际测试版本见发布记录。
+需要 Python 3.11–3.13。下载包含此 README 的源码版本并进入项目目录；当前开发候选尚未发布正式版，稳定版 v0.1.1 不含新增工具。
 
 ```bash
-git clone https://github.com/a2681220474-glitch/feishu-bitable-mcp.git
-cd feishu-bitable-mcp
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install .
-cp .env.example .env
-```
-
-Windows PowerShell 激活命令为 `.venv\Scripts\Activate.ps1`。
-也可下载发行源码，在解压后的目录从 `python3 -m venv .venv` 开始。
-
-仅在本地 `.env` 设置：
-
-```dotenv
-FEISHU_APP_ID=
-FEISHU_APP_SECRET=
-```
-
-从[飞书开发者后台](https://open.feishu.cn/app)的企业自建应用「凭证与基础信息」获取凭证。
-在该应用开通当前 API 所需的多维表格读取权限、发布所需配置，并在目标 Base 设置中授权该应用访问。
-读取失败时先检查应用权限与资源授权，不要把 Secret 或访问令牌贴到 issue。
-
-```bash
+feishu-bitable-mcp --setup
+feishu-bitable-mcp --doctor
 feishu-bitable-mcp
 ```
 
-支持从任意目录显式加载配置，先自检再启动：
+Windows PowerShell 激活：`.venv\Scripts\Activate.ps1`。向导询问自己的飞书 App ID、隐藏输入的 Secret 及公网 HTTPS `/mcp` 地址，创建私有 `.env`，不覆盖已有文件。
 
-```bash
-feishu-bitable-mcp --env-file /absolute/path/to/.env --doctor
-feishu-bitable-mcp --env-file /absolute/path/to/.env --doctor --url '<authorized-test-table-url>'
-feishu-bitable-mcp --env-file /absolute/path/to/.env
-```
+先按 [首次接入指南](docs/setup.md)配置飞书读取权限、应用可用范围、回调 URL 和 HTTPS；在 ChatGPT 添加地址、选择 OAuth、飞书登录。服务默认 `127.0.0.1:8000/mcp`，代理应转发整个服务。
 
-不传 `--url` 不调用飞书；传 URL 后依次检查认证、表、字段和一条记录，只输出阶段状态。
+换启动目录可用 `--env-file /absolute/path/to/.env`；环境变量优先。用户模式 doctor 只验证本地配置，实际 API 权限须在登录后的工具调用中验证。
 
-默认监听 `http://127.0.0.1:8000/mcp`（Streamable HTTP）。仅在当前工作目录加载 `.env`；
-已有环境变量优先。可用 `--host`、`--port` 或 `MCP_HOST`、`MCP_PORT` 改端口。
-服务启动和协议握手不验证飞书凭证，实际工具调用才连接飞书。
+应用身份兼容模式设置 `FEISHU_AUTH_MODE=app`，给应用目标资源权限。静态 Bearer HTTP 客户端配置至少 32 字符 `MCP_AUTH_TOKEN`；非回环监听必须有鉴权。临时 HTTPS 隧道也会暴露回环端口，应先配置鉴权。应用模式也支持 `--transport stdio`。ChatGPT 登录与回调说明见 [OAuth 接入](docs/chatgpt.md)。
 
-```bash
-curl -i http://127.0.0.1:8000/mcp \
-  -H 'Content-Type: application/json' \
-  -H 'Accept: application/json, text/event-stream' \
-  --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"local-check","version":"1.0"}}}'
-```
-
-也支持本机 MCP 客户端使用 stdio：
-
-```bash
-feishu-bitable-mcp --transport stdio
-```
-
-`examples/stdio-client.json` 是通用配置示例；替换路径，并通过客户端环境设置凭证，避免依赖工作目录。
-
-## 远程 HTTP 与 ChatGPT
-
-飞书 App Secret 保护的是上游调用；MCP 调用方需要另行鉴权。
-静态 Bearer 模式下，非回环监听需要至少 32 字符的随机 `MCP_AUTH_TOKEN`。
-ChatGPT 网页端可选择下面的 OAuth 模式。Bearer 凭证可在自己的环境中生成：
-
-```bash
-python -c 'import secrets; print(secrets.token_urlsafe(32))'
-```
-
-将生成值保存在自己的 `.env`/secret manager，不提交或发送到聊天。支持自定义 HTTP 请求头的客户端使用：
-
-```text
-Authorization: Bearer <your MCP_AUTH_TOKEN>
-```
-
-该模式面向单维护者自托管：持有这个凭证的调用方共享同一个飞书应用授权范围。
-它不是 OAuth 授权服务器，不提供每用户授权、撤销 UI 或独立的人类审批服务。
-可用 `FEISHU_READ_TABLE_URLS` 限制所有读取；逗号分隔完整 URL，匹配的是 Base+表，忽略 view。
-
-ChatGPT 网页端需要能从其网络访问的 HTTPS `/mcp` 地址。
-对于 ChatGPT 网页端，本开发分支支持通过三个配置项接入外部 OAuth 身份服务，
-由 FastMCP 提供资源发现和 JWT 校验，详见 [配置步骤](docs/chatgpt.md)。
-身份服务负责登录、PKCE 和客户端注册；本项目不实现授权服务器。
-此 OAuth 模式仅提供只读工具。已发布 v0.1.1 仍需要外部 OAuth 网关。
-尚未完成 ChatGPT 网页端的端到端认证验证；不能保证粘贴一个 URL 就能使用。
-支持手动设置 Bearer 请求头的 MCP 客户端可直接连接。
-
-临时隧道只解决 HTTPS/可达性。需要时可在 macOS 安装 `brew install cloudflared`，
-在本地已经配置鉴权后运行 `cloudflared tunnel --url http://127.0.0.1:8000`，
-最终 URL 为 `https://<generated-host>.trycloudflare.com/mcp`。
-即使服务仍绑定回环地址，隧道也会使其公开可达，所以必须配置鉴权。
-不要公开无认证的业务接口；客户端不支持配置凭证时，应使用合适的 OAuth 网关。
+`FEISHU_READ_TABLE_URLS` 可限制 Base 表；`FEISHU_READ_RESOURCE_URLS` 可限制新工具的资源链接，逗号分隔。空列表表示身份自身已获授权的范围，不会绕过飞书权限。
 
 ## 可选：创建一条记录
 
-默认工具列表不含 `create_record`。操作者必须同时设置：
+用户模式只读。应用身份模式默认也不含 `create_record`；操作者须同时设置：
 
 ```dotenv
+FEISHU_AUTH_MODE=app
+MCP_PUBLIC_URL=
 FEISHU_ENABLE_WRITES=true
 MCP_AUTH_TOKEN=<your random secret of at least 32 characters>
 FEISHU_WRITE_TABLE_URLS=https://example.feishu.cn/base/DemoBaseToken0001?table=tblDemoTable01
@@ -256,10 +185,4 @@ CI 同时验证哈希锁定安装和 `.[dev]` 独立解析安装，并运行 `pi
 
 ## English summary
 
-A community-maintained, small Python/FastMCP server for Feishu Bitable URLs.
-It exposes four read tools and an optional, table-allowlisted `create_record` tool.
-It uses tenant application credentials, preserves upstream field configuration and record fields,
-and supports Streamable HTTP at `/mcp` plus local stdio. No update/delete/schema mutation tools.
-Remote HTTP requires caller authentication; this project's single-owner Bearer verifier is not
-an OAuth server. ChatGPT web authentication and live create/view semantics have not been verified
-for this release candidate. All current automated tests use fictional data and mocked upstream APIs.
+A self-hosted Python/FastMCP service for Feishu Bitable, docx documents, online spreadsheets and uploaded .xlsx files. Nine read tools preserve raw pages and explicit read windows. Feishu user OAuth is available in the development candidate; app identity and guarded optional record creation remain compatible. Streamable HTTP uses `/mcp`. Full synthetic consent/PKCE/read/refresh/revocation tests pass; live Feishu/ChatGPT browser acceptance is pending. See [English README](README.en.md).

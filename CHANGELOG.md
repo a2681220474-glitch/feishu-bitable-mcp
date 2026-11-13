@@ -1,27 +1,22 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 development candidate — unreleased
 
-- Add an alternative GitHub OAuth login using the SDK proxy, requiring an explicit
-  immutable GitHub user-ID allowlist. Request only read:user, retain consent, and
-  restrict client callbacks to ChatGPT. Real browser acceptance remains pending.
+- Add Feishu personal OAuth via the SDK proxy, with consent, PKCE, encrypted state,
+  refresh and reauthorization. Per-request user credentials never fall back to app identity.
+- Add --setup with hidden secret input and exclusive private config creation; preserve
+  --env-file, --doctor, existing application mode and opt-in guarded record creation.
+- Add read_document, get_spreadsheet_info, read_spreadsheet, read_excel_file and
+  resolve_resource for docx, online Sheets, uploaded .xlsx and Wiki resolution.
+- Preserve raw document blocks and record pages, use explicit cell windows and Excel row
+  cursors, reject oversized/encrypted/macro workbooks, and never execute formulas.
+- Add safe read transport retries, concurrency and attempt deadlines, FastMCP 4.1.6 with
+  a synchronized hash lock, and macOS/Windows onboarding CI.
+- Update three-language readmes and deployment/authentication guidance.
 
-- Add explicit `--env-file` and staged, read-only `--doctor` diagnostics. Network checks
-  require an explicit authorized test URL; reports omit credentials and record content.
-- Add optional external OAuth resource discovery and RS256 JWT verification, including
-  issuer, audience, read scope, expiry, subject and not-before checks. OAuth mode is read-only;
-  the identity provider must restrict eligible users. Live ChatGPT browser acceptance is pending.
-- Retry transient read transport failures with bounded backoff and jitter, limit in-flight
-  requests to four, and bound each attempt to 20 seconds. Long Retry-After values stop
-  retries instead of causing premature requests. POST requests still are never retried.
-- Upgrade FastMCP to 4.1.6 and synchronize the dependency hash lock.
-- Document first-use troubleshooting and add macOS/Windows onboarding CI.
-
-Local validation (Python 3.12): 243 synthetic tests passed for both resolved and
-hash-locked/wheel installations; Ruff, dependency consistency, package builds,
-installed-wheel diagnostics from another directory and stdio discovery passed.
-The updated lock has no known vulnerabilities in the advisory scan. Cross-platform
-CI and real ChatGPT/identity-provider acceptance must be checked separately.
+Validation uses synthetic data, including the complete OAuth flow, refresh, revocation,
+concurrent user isolation, new read tools and workbook parsing. Real Feishu/ChatGPT
+browser acceptance is pending. No real resource is created or modified during development.
 
 ## 0.1.1 — 2026-11-06
 
