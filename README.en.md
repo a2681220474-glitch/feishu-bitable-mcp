@@ -6,6 +6,11 @@ See [setup](docs/setup.md) and [ChatGPT OAuth setup](docs/chatgpt.md) (Chinese).
 Published v0.1.1 does not include these additions. Live ChatGPT browser authorization
 with an external identity provider still requires acceptance testing.
 
+Anyone may self-host under MIT using their own Feishu app and resources; approval
+from this project's maintainer is not required. Deployment still needs app setup,
+resource authorization and an HTTPS MCP endpoint. Feishu user-identity authorization
+is not implemented yet. See [deployment and authorization boundaries](docs/user-access.md).
+
 **English** | [简体中文](README.md) | [日本語](README.ja.md)
 
 A lightweight, self-hosted Python MCP server that lets compatible AI clients inspect Feishu Bitable schemas and read records directly from a table URL—without manually exporting a spreadsheet or reimplementing Feishu OpenAPI calls.

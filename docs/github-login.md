@@ -1,6 +1,10 @@
-# 用 GitHub 账号登录 ChatGPT MCP
+# 部署者可选的 GitHub 访问控制
 
 这个方案让 ChatGPT 打开 GitHub 登录页面确认身份。无需另注册 Auth0/Descope；飞书访问仍使用你自己的企业自建应用。底层采用 FastMCP 的 GitHubProvider，不自行实现密码或授权协议。
+
+这是某个部署实例的访问控制，不是使用开源代码的许可要求，也不授予飞书个人数据权限。
+白名单由该实例的部署者管理。项目维护者不会审批他人的独立部署。
+首次使用请先阅读 [使用方式与授权边界](user-access.md)。
 
 **目前已验证本地 OAuth 元数据、PKCE 声明和用户白名单边界；真实 GitHub/ChatGPT 浏览器授权尚待验收。**
 
