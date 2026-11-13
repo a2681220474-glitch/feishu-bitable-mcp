@@ -1,5 +1,11 @@
 # Feishu Bitable MCP
 
+Development branch: explicit `--env-file`, read-only `--doctor [--url <test-url>]`,
+bounded network retries and external OAuth resource-server integration are being added.
+See [setup](docs/setup.md) and [ChatGPT OAuth setup](docs/chatgpt.md) (Chinese).
+Published v0.1.1 does not include these additions. Live ChatGPT browser authorization
+with an external identity provider still requires acceptance testing.
+
 **English** | [简体中文](README.md) | [日本語](README.ja.md)
 
 A lightweight, self-hosted Python MCP server that lets compatible AI clients inspect Feishu Bitable schemas and read records directly from a table URL—without manually exporting a spreadsheet or reimplementing Feishu OpenAPI calls.
@@ -79,7 +85,7 @@ The Feishu app secret grants upstream API access; it **does not authenticate cal
 
 - For non-loopback HTTP binding, configure a random `MCP_AUTH_TOKEN` (at least 32 characters); the client must support `Authorization: Bearer …`.
 - Exposing a local port through an HTTPS tunnel still makes it remotely reachable. Never expose an unauthenticated business-data service.
-- This project is not an OAuth authorization server. Some remote MCP clients, including certain ChatGPT configurations, may require an external OAuth/OIDC gateway. **End-to-end ChatGPT web authentication has not been verified for this release.**
+- This project is not an OAuth authorization server. The development branch can use an external issuer with RS256 JWTs for MCP discovery and verification; see [ChatGPT setup](docs/chatgpt.md). Published v0.1.1 still needs an external OAuth/OIDC gateway. **End-to-end ChatGPT web authentication remains unverified.**
 - Use `FEISHU_READ_TABLE_URLS` to restrict readable tables when needed.
 - To enable the optional creation tool, set `FEISHU_ENABLE_WRITES=true`, `MCP_AUTH_TOKEN`, and `FEISHU_WRITE_TABLE_URLS`. The server validates supported field types and rejects unsupported write types.
 - `confirm=true` represents the calling client's assertion of user approval; it is not proof of human authorization. Keep writes disabled unless your client enforces appropriate approval.

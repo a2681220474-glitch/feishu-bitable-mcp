@@ -14,7 +14,7 @@ If a credential was exposed, revoke or rotate it through the relevant provider. 
 
 - Feishu permissions remain authoritative. Grant the application only the Base permissions and file access it needs.
 - Treat the MCP server's application identity as shared infrastructure: every authorized MCP caller acts through that configured identity. This is not per-user Feishu OAuth or a multi-tenant authorization service.
-- Protect remote HTTP with HTTPS and `MCP_AUTH_TOKEN`; keep the bearer token private. Non-loopback HTTP binding requires authentication. A public tunnel alone is not authentication.
+- Protect remote HTTP with HTTPS and `MCP_AUTH_TOKEN`, or the development branch's external OAuth configuration. Keep bearer credentials private. OAuth deployments must restrict eligible users at the identity provider; the same app-authorized Feishu resources are shared among them. Non-loopback HTTP binding requires authentication. A public tunnel alone is not authentication.
 - Use operator table allowlists where possible. View selection is a reading option, not an authorization boundary.
 - Record creation is optional and disabled by default. If enabled, restrict the write allowlist to intended test or business targets and require approval of the exact table URL and fields.
 - The `confirm` argument communicates caller confirmation; it does not independently prove that a human approved a request. Operators and clients must enforce their own approval workflow.

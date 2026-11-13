@@ -1,7 +1,7 @@
 """Caller authentication for an operator-controlled, single-owner deployment.
 
-This verifier is not an OAuth authorization server. Interactive clients that
-require OAuth discovery need an authenticating OAuth gateway in front of it.
+Static Bearer verification or external OAuth resource-server integration.
+The external identity provider handles browser login and authorization.
 Feishu credentials authenticate the upstream application, not the MCP caller.
 """
 
@@ -9,8 +9,14 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import math
+import time
 
-from fastmcp.server.auth import AccessToken, AuthProvider, TokenVerifier
+from fastmcp.server.auth import AccessToken, AuthProvider, RemoteAuthProvider, TokenVerifier
+from fastmcp.server.auth.providers.jwt import JWTVerifier
+from pydantic import AnyHttpUrl
+
+from .config import Settings
 
 
 class SingleOwnerTokenVerifier(TokenVerifier):
@@ -45,3 +51,46 @@ class SingleOwnerTokenVerifier(TokenVerifier):
 def build_auth(token: str) -> AuthProvider | None:
     """Build optional caller auth; the CLI separately enforces safe host binding."""
     return SingleOwnerTokenVerifier(token) if token else None
+
+
+class OAuthTokenVerifier(TokenVerifier):
+    """Require exp/sub, honor nbf, and remove raw credentials from auth context."""
+
+    def __init__(self, verifier: JWTVerifier):
+        super().__init__(required_scopes=["read"])
+        self.verifier = verifier
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        result = await self.verifier.verify_token(token)
+        if result is None or result.expires_at is None or not result.subject:
+            return None
+        not_before = result.claims.get("nbf")
+        if not_before is not None and (
+            type(not_before) not in (int, float)
+            or not math.isfinite(not_before)
+            or not_before > time.time()
+        ):
+            return None
+        return AccessToken(
+            token="<redacted>", client_id="oauth-user", subject=result.subject,
+            scopes=result.scopes, expires_at=result.expires_at,
+        )
+
+
+def configured_auth(settings: Settings) -> AuthProvider | None:
+    """Use an external OAuth issuer; never implement an authorization server here."""
+    if not settings.oauth_issuer:
+        return build_auth(settings.auth_token)
+    verifier = JWTVerifier(
+        jwks_uri=settings.oauth_jwks_url,
+        issuer=settings.oauth_issuer,
+        audience=settings.public_url,
+        algorithm="RS256",
+        required_scopes=["read"],
+    )
+    return RemoteAuthProvider(
+        token_verifier=OAuthTokenVerifier(verifier),
+        authorization_servers=[AnyHttpUrl(settings.oauth_issuer)],
+        base_url=settings.public_url.removesuffix("/mcp"),
+        resource_name="Feishu Bitable MCP",
+    )

@@ -56,6 +56,10 @@ https://example.feishu.cn/base/DemoBaseToken0001?table=tblDemoTable01&view=vewDe
 
 ## 安装与本地启动
 
+首次配置建议按 [配置与自检指南](docs/setup.md)完成；ChatGPT 网页端使用者请阅读
+[外部 OAuth 接入与待验收项](docs/chatgpt.md)。当前开发分支增加了 OAuth 资源服务器支持，
+真实 ChatGPT 浏览器授权仍待验证；已发布 v0.1.1 不包含这项新增能力。
+
 需要 Python 3.11+。已配置 Python 3.11–3.13 CI；本地实际测试版本见发布记录。
 
 ```bash
@@ -84,6 +88,16 @@ FEISHU_APP_SECRET=
 ```bash
 feishu-bitable-mcp
 ```
+
+支持从任意目录显式加载配置，先自检再启动：
+
+```bash
+feishu-bitable-mcp --env-file /absolute/path/to/.env --doctor
+feishu-bitable-mcp --env-file /absolute/path/to/.env --doctor --url '<authorized-test-table-url>'
+feishu-bitable-mcp --env-file /absolute/path/to/.env
+```
+
+不传 `--url` 不调用飞书；传 URL 后依次检查认证、表、字段和一条记录，只输出阶段状态。
 
 默认监听 `http://127.0.0.1:8000/mcp`（Streamable HTTP）。仅在当前工作目录加载 `.env`；
 已有环境变量优先。可用 `--host`、`--port` 或 `MCP_HOST`、`MCP_PORT` 改端口。
@@ -124,9 +138,11 @@ Authorization: Bearer <your MCP_AUTH_TOKEN>
 可用 `FEISHU_READ_TABLE_URLS` 限制所有读取；逗号分隔完整 URL，匹配的是 Base+表，忽略 view。
 
 ChatGPT 网页端需要能从其网络访问的 HTTPS `/mcp` 地址。
-对于需要 OAuth 的客户端，应先部署受信任的 OAuth/OIDC 网关，并让网关验证客户端授权、
-通过服务器侧配置把请求转发到有 Bearer 保护的本服务。OAuth 网关本身不在本项目范围内。
-本版没有完成 ChatGPT 网页端的端到端认证验证；不会声称粘贴一个 URL 就一定可用。
+对于 ChatGPT 网页端，本开发分支支持通过三个配置项接入外部 OAuth 身份服务，
+由 FastMCP 提供资源发现和 JWT 校验，详见 [配置步骤](docs/chatgpt.md)。
+身份服务负责登录、PKCE 和客户端注册；本项目不实现授权服务器。
+此 OAuth 模式仅提供只读工具。已发布 v0.1.1 仍需要外部 OAuth 网关。
+尚未完成 ChatGPT 网页端的端到端认证验证；不能保证粘贴一个 URL 就能使用。
 支持手动设置 Bearer 请求头的 MCP 客户端可直接连接。
 
 临时隧道只解决 HTTPS/可达性。需要时可在 macOS 安装 `brew install cloudflared`，
@@ -170,8 +186,11 @@ FEISHU_WRITE_TABLE_URLS=https://example.feishu.cn/base/DemoBaseToken0001?table=t
 ## 错误与可维护性
 
 - Token 在内存缓存，带提前过期时间和并发锁；读取遇到已过期 token 时最多刷新重试一次。
-- 只读 HTTP 429/部分 5xx 最多尝试三次，尊重有上限的 `Retry-After`。不自动重试写入。
-- HTTP 请求有连接/总时长限制；字段和表列表有分页循环保护及页数上限。
+- 读取遇到暂时性网络失败、HTTP 429/部分 5xx 最多尝试三次，使用带抖动的退避。
+  `Retry-After` 超过 5 秒时直接返回上游错误，交由调用方稍后重试，不提前重发请求。
+  不自动重试写入或获取 token 的 POST 请求。
+- 每次 HTTP 尝试最多 20 秒（含并发排队），同一客户端最多四个请求同时在途；工具总预算为 90 秒。
+  字段和表列表有分页循环保护及页数上限。
 - 飞书错误包含 HTTP 状态、code、经脱敏的 msg；不返回原始 HTTP 响应体、凭证或请求头。
   日志中不记录输入字段和凭证。调试时也不要开启会记录鉴权头的外部代理日志。
 - 创建校验错误会指出字段名与预期格式，不回显提交值；字段名截断至 120 字符并转义控制字符。

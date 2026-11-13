@@ -50,6 +50,25 @@ jobs:
       - name: Build source and wheel distributions
         run: python -m build
 
+  onboarding:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install '.[dev]'
+      - run: python -m pip check
+      - name: Check packaged CLI and offline authorization boundaries
+        run: python -m pytest tests/test_cli.py tests/test_doctor.py tests/test_auth.py tests/test_oauth.py
+
   dependency-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -17,7 +17,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from . import __version__
-from .auth import build_auth
+from .auth import configured_auth
 from .client import FeishuClient
 from .config import BitableError, Settings, Target
 from .writes import validate_fields
@@ -52,7 +52,7 @@ def build_server(settings: Settings, client: FeishuClient | None = None) -> Fast
             "Creation, if present, requires operator allowlisting "
             "and explicit user confirmation of the target URL and exact fields."
         ),
-        auth=build_auth(settings.auth_token),
+        auth=configured_auth(settings),
         mask_error_details=True,
         lifespan=lifespan,
     )
@@ -174,22 +174,39 @@ def validate_bind(host: str, auth_token: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="A small URL-driven Feishu Bitable MCP server.")
+    parser.add_argument("--version", action="version", version=__version__)
     parser.add_argument("--transport", choices=["http", "stdio"], default="http")
     parser.add_argument("--host", default=None)
     parser.add_argument("--port", type=int, default=None)
+    parser.add_argument("--env-file", help="Explicit .env path; environment takes priority.")
+    parser.add_argument("--doctor", action="store_true", help="Check configuration; do not serve.")
+    parser.add_argument("--url", help="With --doctor, perform read-only checks on this test table.")
     args = parser.parse_args()
     # Only explicitly named local .env; never discover the old project's credentials.
-    load_dotenv(".env", override=False)
+    from pathlib import Path
+
+    if args.url and not args.doctor:
+        parser.error("--url requires --doctor")
+    if args.env_file and not Path(args.env_file).is_file():
+        parser.exit(2, "Configuration error: --env-file must point to an existing file.\n")
+    load_dotenv(args.env_file or ".env", override=False)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
+    if args.doctor:
+        from .doctor import run_doctor
+
+        raise SystemExit(asyncio.run(run_doctor(args.url)))
     try:
         settings = Settings.from_env()
         host = args.host or os.getenv("MCP_HOST", "127.0.0.1")
-        port = args.port if args.port is not None else int(os.getenv("MCP_PORT", "8000"))
+        try:
+            port = args.port if args.port is not None else int(os.getenv("MCP_PORT", "8000"))
+        except ValueError:
+            raise BitableError("MCP_PORT must be an integer between 1 and 65535.") from None
         if not 1 <= port <= 65535:
             raise BitableError("MCP_PORT must be between 1 and 65535.")
         if args.transport == "http":
-            validate_bind(host, settings.auth_token)
+            validate_bind(host, settings.auth_token or settings.oauth_issuer)
         server = build_server(settings)
     except (BitableError, ValueError) as exc:
         parser.exit(2, f"Configuration error: {exc}\n")

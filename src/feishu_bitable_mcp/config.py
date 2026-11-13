@@ -82,6 +82,9 @@ class Settings:
     enable_writes: bool = False
     read_tables: frozenset[tuple[str, str]] = frozenset()
     write_tables: frozenset[tuple[str, str]] = frozenset()
+    oauth_issuer: str = ""
+    oauth_jwks_url: str = ""
+    public_url: str = ""
 
     def __post_init__(self) -> None:
         if not self.app_id or not self.app_secret:
@@ -90,6 +93,29 @@ class Settings:
             raise BitableError("MCP_AUTH_TOKEN must contain at least 32 characters.")
         if self.enable_writes and (not self.auth_token or not self.write_tables):
             raise BitableError("Writes require MCP_AUTH_TOKEN and exact FEISHU_WRITE_TABLE_URLS.")
+        oauth = (self.oauth_issuer, self.oauth_jwks_url, self.public_url)
+        if any(oauth):
+            if not all(oauth) or self.auth_token:
+                raise BitableError(
+                    "Set all MCP_OAUTH_ISSUER, MCP_OAUTH_JWKS_URL and MCP_PUBLIC_URL; "
+                    "leave MCP_AUTH_TOKEN empty in OAuth mode."
+                )
+            for value in oauth:
+                try:
+                    parts = urlsplit(value)
+                    valid = (
+                        parts.scheme == "https" and bool(parts.hostname)
+                        and parts.username is None and parts.password is None
+                        and parts.port is None and not parts.query and not parts.fragment
+                        and not any(c.isspace() or ord(c) < 32 for c in value)
+                        and "\\" not in value
+                    )
+                except ValueError:
+                    valid = False
+                if not valid:
+                    raise BitableError("OAuth settings require HTTPS URLs without credentials.")
+            if urlsplit(self.public_url).path != "/mcp":
+                raise BitableError("MCP_PUBLIC_URL must be the public HTTPS endpoint ending /mcp.")
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -103,6 +129,9 @@ class Settings:
             enable_writes=flag == "true",
             read_tables=_targets("FEISHU_READ_TABLE_URLS"),
             write_tables=_targets("FEISHU_WRITE_TABLE_URLS"),
+            oauth_issuer=os.getenv("MCP_OAUTH_ISSUER", "").strip(),
+            oauth_jwks_url=os.getenv("MCP_OAUTH_JWKS_URL", "").strip(),
+            public_url=os.getenv("MCP_PUBLIC_URL", "").strip(),
         )
 
     def authorize(self, target: Target, *, write: bool = False) -> None:

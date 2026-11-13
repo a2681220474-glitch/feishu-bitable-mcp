@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import math
+import random
 import re
 import time
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 import httpx
@@ -15,6 +17,7 @@ from .config import BitableError, Settings, Target
 API_ROOT = "https://open.feishu.cn/open-apis"
 TOKEN_ROUTE = "/auth/v3/tenant_access_token/internal"
 EXPIRED_TOKEN_CODES = {99991663, 99991668}
+ATTEMPT_TIMEOUT = 20
 FIELD_TYPES = {
     1: "Text",
     2: "Number",
@@ -57,6 +60,7 @@ class FeishuClient:
         self._token = ""
         self._expires = 0.0
         self._token_lock = asyncio.Lock()
+        self._requests = asyncio.Semaphore(4)
 
     async def close(self) -> None:
         await self._http.aclose()
@@ -111,34 +115,48 @@ class FeishuClient:
         # Retry only GET. POST may have succeeded even when the response was lost.
         for attempt in range(3 if method == "GET" else 1):
             try:
-                response = await self._http.request(method, route, **kwargs)
-            except httpx.TimeoutException:
+                async with asyncio.timeout(ATTEMPT_TIMEOUT), self._requests:
+                    response = await self._http.request(method, route, **kwargs)
+            except (httpx.HTTPError, TimeoutError) as exc:
+                if (
+                    method == "GET" and attempt < 2
+                    and isinstance(exc, (httpx.TransportError, TimeoutError))
+                ):
+                    await asyncio.sleep(random.uniform(0.1, 0.25) * 2**attempt)
+                    continue
                 detail = (
                     " Write outcome is unknown; inspect records before retrying."
                     if method == "POST" and route != TOKEN_ROUTE
                     else ""
                 )
-                raise BitableError("Feishu request timed out." + detail) from None
-            except httpx.HTTPError:
-                detail = (
-                    " Write outcome is unknown; inspect records before retrying."
-                    if method == "POST" and route != TOKEN_ROUTE
-                    else ""
+                message = (
+                    "Feishu request timed out."
+                    if isinstance(exc, (httpx.TimeoutException, TimeoutError))
+                    else "Feishu network request failed."
                 )
-                raise BitableError("Feishu network request failed." + detail) from None
+                raise BitableError(message + detail) from None
             if (
                 method != "GET"
                 or response.status_code not in {429, 500, 502, 503, 504}
                 or attempt == 2
             ):
                 return response
-            try:
-                delay = float(response.headers.get("Retry-After", "0.25"))
-            except ValueError:
-                delay = 0.25
-            if not math.isfinite(delay):
-                delay = 0.25
-            await asyncio.sleep(min(max(delay, 0.0), 2.0))
+            delay = random.uniform(0.1, 0.25) * 2**attempt
+            retry_after = response.headers.get("Retry-After")
+            if retry_after:
+                try:
+                    wait = float(retry_after)
+                except ValueError:
+                    try:
+                        wait = parsedate_to_datetime(retry_after).timestamp() - time.time()
+                    except (ValueError, TypeError, OverflowError):
+                        wait = 0.0
+                if math.isfinite(wait):
+                    if wait > 5:
+                        # Do not retry earlier than instructed or exceed the tool budget.
+                        return response
+                    delay = max(delay, wait)
+            await asyncio.sleep(delay)
         raise AssertionError("unreachable")
 
     async def token(self) -> str:

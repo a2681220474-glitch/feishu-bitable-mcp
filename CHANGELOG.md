@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+- Add explicit `--env-file` and staged, read-only `--doctor` diagnostics. Network checks
+  require an explicit authorized test URL; reports omit credentials and record content.
+- Add optional external OAuth resource discovery and RS256 JWT verification, including
+  issuer, audience, read scope, expiry, subject and not-before checks. OAuth mode is read-only;
+  the identity provider must restrict eligible users. Live ChatGPT browser acceptance is pending.
+- Retry transient read transport failures with bounded backoff and jitter, limit in-flight
+  requests to four, and bound each attempt to 20 seconds. Long Retry-After values stop
+  retries instead of causing premature requests. POST requests still are never retried.
+- Upgrade FastMCP to 4.1.6 and synchronize the dependency hash lock.
+- Document first-use troubleshooting and add macOS/Windows onboarding CI.
+
+Local validation (Python 3.12): 236 synthetic tests passed for both resolved and
+hash-locked/wheel installations; Ruff, dependency consistency, package builds,
+installed-wheel diagnostics from another directory and stdio discovery passed.
+The updated lock has no known vulnerabilities in the advisory scan. Cross-platform
+CI and real ChatGPT/identity-provider acceptance must be checked separately.
+
 ## 0.1.1 — 2026-11-06
 
 - Redact credentials used by each in-flight request, including both attempts of a refreshed read, even when concurrent calls replace the cached tenant token. Credentials are retained only for that request, not in an accumulating token history.

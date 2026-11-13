@@ -1,5 +1,10 @@
 # Feishu Bitable MCP
 
+開発ブランチでは `--env-file`、読み取り専用の `--doctor [--url <test-url>]`、
+ネットワーク再試行、外部 OAuth リソースサーバー連携を追加しています。
+[初期設定](docs/setup.md)と[ChatGPT OAuth 設定](docs/chatgpt.md)（中国語）を参照してください。
+公開済み v0.1.1 には含まれません。実際の ChatGPT ブラウザー認証は引き続き検証が必要です。
+
 [English](README.en.md) | [简体中文](README.md) | **日本語**
 
 **保守リリース v0.1.1：** 同時実行時のトークン更新に伴うエラーのマスキングを修正し、入力値を表示せずに問題のフィールドと期待する形式を示します。依存関係とハッシュ付きロックファイルを更新し、CI にロック指定・個別解決のインストール検証と週次の依存関係監査を追加しました。[CHANGELOG](CHANGELOG.md) を参照してください。
@@ -81,7 +86,7 @@ Feishu の App Secret は上流 API 用の認証情報であり、**MCP サー�
 
 - ループバック以外で HTTP を公開する際は、32 文字以上のランダムな `MCP_AUTH_TOKEN` が必要です。クライアントは `Authorization: Bearer …` に対応している必要があります。
 - HTTPS トンネルを使っても、ポートは外部からアクセス可能になります。認証のない業務データ API を公開しないでください。
-- このプロジェクトは OAuth サーバーを提供しません。ChatGPT Web など、一部の MCP クライアントでは外部 OAuth/OIDC ゲートウェイが必要な場合があります。**本リリースで ChatGPT Web の認証を実環境検証したわけではありません。**
+- 本プロジェクトは OAuth 認可サーバーを提供しません。開発ブランチは外部発行者の RS256 JWT とリソース検出に対応します（[設定](docs/chatgpt.md)）。公開済み v0.1.1 は外部 OAuth/OIDC ゲートウェイが必要です。**ChatGPT Web の実際のブラウザー認証は引き続き未検証です。**
 - 必要に応じて `FEISHU_READ_TABLE_URLS` で読み取り対象を制限できます。
 - レコード作成を有効にするには、`FEISHU_ENABLE_WRITES=true`、`MCP_AUTH_TOKEN`、`FEISHU_WRITE_TABLE_URLS` を設定します。許可されたフィールド型のみ書き込めます。
 - `confirm=true` はクライアントからの承認申告であり、独立した本人承認の証明ではありません。適切な承認手続きがない場合、書き込みは無効のままにしてください。
