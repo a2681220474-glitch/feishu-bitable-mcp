@@ -15,6 +15,7 @@ def isolated_cli(monkeypatch, tmp_path):
         "FEISHU_APP_ID", "FEISHU_APP_SECRET", "MCP_AUTH_TOKEN", "FEISHU_ENABLE_WRITES",
         "FEISHU_READ_TABLE_URLS", "FEISHU_WRITE_TABLE_URLS", "MCP_OAUTH_ISSUER",
         "MCP_OAUTH_JWKS_URL", "MCP_PUBLIC_URL", "MCP_HOST", "MCP_PORT",
+        "MCP_GITHUB_CLIENT_ID", "MCP_GITHUB_CLIENT_SECRET", "MCP_GITHUB_ALLOWED_USER_IDS",
     ]:
         monkeypatch.delenv(key, raising=False)
     return monkeypatch, tmp_path

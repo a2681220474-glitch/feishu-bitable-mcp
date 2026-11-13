@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add an alternative GitHub OAuth login using the SDK proxy, requiring an explicit
+  immutable GitHub user-ID allowlist. Request only read:user, retain consent, and
+  restrict client callbacks to ChatGPT. Real browser acceptance remains pending.
+
 - Add explicit `--env-file` and staged, read-only `--doctor` diagnostics. Network checks
   require an explicit authorized test URL; reports omit credentials and record content.
 - Add optional external OAuth resource discovery and RS256 JWT verification, including
@@ -13,7 +17,7 @@
 - Upgrade FastMCP to 4.1.6 and synchronize the dependency hash lock.
 - Document first-use troubleshooting and add macOS/Windows onboarding CI.
 
-Local validation (Python 3.12): 236 synthetic tests passed for both resolved and
+Local validation (Python 3.12): 243 synthetic tests passed for both resolved and
 hash-locked/wheel installations; Ruff, dependency consistency, package builds,
 installed-wheel diagnostics from another directory and stdio discovery passed.
 The updated lock has no known vulnerabilities in the advisory scan. Cross-platform

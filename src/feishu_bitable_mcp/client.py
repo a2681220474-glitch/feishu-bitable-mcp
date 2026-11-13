@@ -70,6 +70,7 @@ class FeishuClient:
         secrets = {
             self.settings.app_secret,
             self.settings.auth_token,
+            self.settings.github_client_secret,
             self._token,
             *request_tokens,
         }

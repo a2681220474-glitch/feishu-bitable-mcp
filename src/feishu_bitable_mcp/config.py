@@ -85,15 +85,36 @@ class Settings:
     oauth_issuer: str = ""
     oauth_jwks_url: str = ""
     public_url: str = ""
+    github_client_id: str = field(default="", repr=False)
+    github_client_secret: str = field(default="", repr=False)
+    github_allowed_ids: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
         if not self.app_id or not self.app_secret:
             raise BitableError("Set FEISHU_APP_ID and FEISHU_APP_SECRET in your local .env.")
-        if self.auth_token and len(self.auth_token) < 32:
-            raise BitableError("MCP_AUTH_TOKEN must contain at least 32 characters.")
+        if self.auth_token and (
+            len(self.auth_token) < 32 or any(c.isspace() for c in self.auth_token)
+        ):
+            raise BitableError("MCP_AUTH_TOKEN needs at least 32 characters without whitespace.")
         if self.enable_writes and (not self.auth_token or not self.write_tables):
             raise BitableError("Writes require MCP_AUTH_TOKEN and exact FEISHU_WRITE_TABLE_URLS.")
-        oauth = (self.oauth_issuer, self.oauth_jwks_url, self.public_url)
+        github = self.github_client_id or self.github_client_secret or self.github_allowed_ids
+        if github and (
+            not self.github_client_id or not self.github_client_secret
+            or not self.github_allowed_ids or not self.public_url or self.auth_token
+            or self.oauth_issuer or self.oauth_jwks_url or self.enable_writes
+        ):
+            raise BitableError(
+                "GitHub login requires MCP_GITHUB_CLIENT_ID, MCP_GITHUB_CLIENT_SECRET, "
+                "MCP_GITHUB_ALLOWED_USER_IDS and MCP_PUBLIC_URL; keep writes disabled "
+                "and other authentication settings empty."
+            )
+        if any(not re.fullmatch(r"[1-9][0-9]{0,19}", x) for x in self.github_allowed_ids):
+            raise BitableError("MCP_GITHUB_ALLOWED_USER_IDS must contain numeric GitHub user IDs.")
+        oauth = (
+            (self.public_url,) if github
+            else (self.oauth_issuer, self.oauth_jwks_url, self.public_url)
+        )
         if any(oauth):
             if not all(oauth) or self.auth_token:
                 raise BitableError(
@@ -132,6 +153,12 @@ class Settings:
             oauth_issuer=os.getenv("MCP_OAUTH_ISSUER", "").strip(),
             oauth_jwks_url=os.getenv("MCP_OAUTH_JWKS_URL", "").strip(),
             public_url=os.getenv("MCP_PUBLIC_URL", "").strip(),
+            github_client_id=os.getenv("MCP_GITHUB_CLIENT_ID", "").strip(),
+            github_client_secret=os.getenv("MCP_GITHUB_CLIENT_SECRET", "").strip(),
+            github_allowed_ids=frozenset(
+                value.strip() for value in os.getenv("MCP_GITHUB_ALLOWED_USER_IDS", "").split(",")
+                if value.strip()
+            ),
         )
 
     def authorize(self, target: Target, *, write: bool = False) -> None:

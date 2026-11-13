@@ -6,7 +6,6 @@ import asyncio
 import json
 from typing import Any
 
-from .auth import configured_auth
 from .client import FeishuClient
 from .config import BitableError, Settings, Target
 
@@ -51,7 +50,6 @@ async def diagnose(settings: Settings, url: str | None, api: FeishuClient) -> di
 async def run_doctor(url: str | None) -> int:
     try:
         settings = Settings.from_env()
-        configured_auth(settings)
     except (BitableError, ValueError) as exc:
         # Even invalid environment values must never be echoed to the terminal.
         print(json.dumps({"ok": False, "checks": [{

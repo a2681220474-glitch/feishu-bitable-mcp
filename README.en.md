@@ -83,7 +83,7 @@ See [the complete Chinese README](README.md) for MCP initialization requests, Wi
 
 The Feishu app secret grants upstream API access; it **does not authenticate callers of your MCP server**.
 
-- For non-loopback HTTP binding, configure a random `MCP_AUTH_TOKEN` (at least 32 characters); the client must support `Authorization: Bearer …`.
+- In static Bearer mode, non-loopback binding requires `MCP_AUTH_TOKEN` (32+ characters) and a client supporting `Authorization: Bearer …`. The development branch also supports [GitHub login](docs/github-login.md) for ChatGPT.
 - Exposing a local port through an HTTPS tunnel still makes it remotely reachable. Never expose an unauthenticated business-data service.
 - This project is not an OAuth authorization server. The development branch can use an external issuer with RS256 JWTs for MCP discovery and verification; see [ChatGPT setup](docs/chatgpt.md). Published v0.1.1 still needs an external OAuth/OIDC gateway. **End-to-end ChatGPT web authentication remains unverified.**
 - Use `FEISHU_READ_TABLE_URLS` to restrict readable tables when needed.

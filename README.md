@@ -59,6 +59,7 @@ https://example.feishu.cn/base/DemoBaseToken0001?table=tblDemoTable01&view=vewDe
 首次配置建议按 [配置与自检指南](docs/setup.md)完成；ChatGPT 网页端使用者请阅读
 [外部 OAuth 接入与待验收项](docs/chatgpt.md)。当前开发分支增加了 OAuth 资源服务器支持，
 真实 ChatGPT 浏览器授权仍待验证；已发布 v0.1.1 不包含这项新增能力。
+个人使用者优先阅读 [使用 GitHub 账号登录](docs/github-login.md)，无需注册额外身份服务。
 
 需要 Python 3.11+。已配置 Python 3.11–3.13 CI；本地实际测试版本见发布记录。
 
@@ -121,7 +122,8 @@ feishu-bitable-mcp --transport stdio
 ## 远程 HTTP 与 ChatGPT
 
 飞书 App Secret 保护的是上游调用；MCP 调用方需要另行鉴权。
-除回环地址外，启动必须配置至少 32 字符的随机 `MCP_AUTH_TOKEN`。例如在自己的环境中生成：
+静态 Bearer 模式下，非回环监听需要至少 32 字符的随机 `MCP_AUTH_TOKEN`。
+ChatGPT 网页端可选择下面的 OAuth 模式。Bearer 凭证可在自己的环境中生成：
 
 ```bash
 python -c 'import secrets; print(secrets.token_urlsafe(32))'

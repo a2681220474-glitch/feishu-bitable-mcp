@@ -192,6 +192,7 @@ def main() -> None:
     load_dotenv(args.env_file or ".env", override=False)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("httpx2").setLevel(logging.WARNING)
     if args.doctor:
         from .doctor import run_doctor
 
@@ -206,7 +207,7 @@ def main() -> None:
         if not 1 <= port <= 65535:
             raise BitableError("MCP_PORT must be between 1 and 65535.")
         if args.transport == "http":
-            validate_bind(host, settings.auth_token or settings.oauth_issuer)
+            validate_bind(host, settings.auth_token or settings.public_url)
         server = build_server(settings)
     except (BitableError, ValueError) as exc:
         parser.exit(2, f"Configuration error: {exc}\n")

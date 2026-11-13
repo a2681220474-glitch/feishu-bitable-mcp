@@ -13,6 +13,7 @@ import math
 import time
 
 from fastmcp.server.auth import AccessToken, AuthProvider, RemoteAuthProvider, TokenVerifier
+from fastmcp.server.auth.providers.github import GitHubProvider
 from fastmcp.server.auth.providers.jwt import JWTVerifier
 from pydantic import AnyHttpUrl
 
@@ -77,8 +78,36 @@ class OAuthTokenVerifier(TokenVerifier):
         )
 
 
-def configured_auth(settings: Settings) -> AuthProvider | None:
-    """Use an external OAuth issuer; never implement an authorization server here."""
+class AllowedGitHubProvider(GitHubProvider):
+    """Use SDK OAuth proxy and allow only explicitly configured immutable user IDs."""
+
+    def __init__(self, allowed_ids: frozenset[str], **kwargs):
+        self.allowed_ids = allowed_ids
+        super().__init__(**kwargs)
+
+    async def load_access_token(self, token: str) -> AccessToken | None:
+        result = await super().load_access_token(token)
+        if result is None or result.subject not in self.allowed_ids:
+            return None
+        return AccessToken(
+            token="<redacted>", client_id="github-user", subject=result.subject,
+            scopes=result.scopes, expires_at=result.expires_at,
+        )
+
+
+def configured_auth(settings: Settings, *, oauth_storage=None) -> AuthProvider | None:
+    """Select SDK-managed GitHub login, an external issuer, or static Bearer auth."""
+    if settings.github_client_id:
+        return AllowedGitHubProvider(
+            allowed_ids=settings.github_allowed_ids,
+            client_id=settings.github_client_id,
+            client_secret=settings.github_client_secret,
+            base_url=settings.public_url.removesuffix("/mcp"),
+            required_scopes=["read:user"],
+            client_storage=oauth_storage,
+            require_authorization_consent=True,
+            allowed_client_redirect_uris=["https://chatgpt.com/*"],
+        )
     if not settings.oauth_issuer:
         return build_auth(settings.auth_token)
     verifier = JWTVerifier(

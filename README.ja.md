@@ -84,7 +84,7 @@ feishu-bitable-mcp --transport stdio
 
 Feishu の App Secret は上流 API 用の認証情報であり、**MCP サーバーへのアクセスを認証するものではありません**。
 
-- ループバック以外で HTTP を公開する際は、32 文字以上のランダムな `MCP_AUTH_TOKEN` が必要です。クライアントは `Authorization: Bearer …` に対応している必要があります。
+- 静的 Bearer モードで外部公開する場合は、32 文字以上の `MCP_AUTH_TOKEN` と対応クライアントが必要です。開発ブランチは [GitHub ログイン](docs/github-login.md)にも対応します。
 - HTTPS トンネルを使っても、ポートは外部からアクセス可能になります。認証のない業務データ API を公開しないでください。
 - 本プロジェクトは OAuth 認可サーバーを提供しません。開発ブランチは外部発行者の RS256 JWT とリソース検出に対応します（[設定](docs/chatgpt.md)）。公開済み v0.1.1 は外部 OAuth/OIDC ゲートウェイが必要です。**ChatGPT Web の実際のブラウザー認証は引き続き未検証です。**
 - 必要に応じて `FEISHU_READ_TABLE_URLS` で読み取り対象を制限できます。
