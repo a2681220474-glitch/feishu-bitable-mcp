@@ -1,5 +1,23 @@
 # Changelog
 
+## Post-rc1 development — unreleased
+
+- Add opt-in named changes across Bitable, Docx, online Sheets and Drive XLSX through
+  prepare_change / commit_change / get_change_status. Existing read-only defaults stay intact.
+- Separate operation/resource allowlists and actual user-granted scopes; do not infer
+  write grants from requested configuration or fall back to application credentials.
+- Persist single-dispatch receipts and resource leases in private SQLite storage, bind
+  previews to actor/content/expiry, check optimistic snapshots, and hold uncertain outcomes.
+- Add offline operator reconciliation without making old request IDs retryable.
+- Bound batch sizes, cells and basic styles; insert rows explicitly for Sheets append.
+  Preserve unrelated OOXML parts during XLSX edits and refuse unsupported workbooks.
+- Keep same-token XLSX overwrite experimental and separately gated; the transport follows
+  official CLI source, with no claim of verified Drive version-history behavior.
+
+Only synthetic transport/OAuth/workbook tests have run. No live Feishu resource or app
+configuration was modified. Strict atomic CAS, complex document blocks and full Base
+reconstruction remain unsupported. See docs/changes.md for exact payloads and limitations.
+
 ## 0.2.0 development candidate — unreleased
 
 - Add Feishu personal OAuth via the SDK proxy, with consent, PKCE, encrypted state,

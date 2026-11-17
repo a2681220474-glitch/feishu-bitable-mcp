@@ -117,7 +117,7 @@ class FeishuProvider(OAuthProxy):
             upstream_token_endpoint=TOKEN_URL,
             upstream_client_id=settings.app_id,
             upstream_client_secret=settings.app_secret,
-            token_verifier=FeishuUserVerifier(list(settings.user_scopes)),
+            token_verifier=FeishuUserVerifier([]),
             valid_scopes=list(settings.user_scopes),
             base_url=settings.public_url.removesuffix("/mcp"),
             client_storage=client_storage,
@@ -126,6 +126,29 @@ class FeishuProvider(OAuthProxy):
             require_authorization_consent=True,
             allowed_client_redirect_uris=["https://chatgpt.com/*"],
         )
+        self.update_default_scopes(list(settings.user_scopes))
+
+    async def load_access_token(self, token: str) -> AccessToken | None:
+        result = await super().load_access_token(token)
+        if result is None:
+            return None
+        try:
+            claims = self.jwt_issuer.verify_token(token)
+            mapping = await self._jti_mapping_store.get(key=claims["jti"])
+            if mapping is None:
+                return None
+            stored = await self._upstream_token_store.get(key=mapping.upstream_token_id)
+            if stored is None:
+                return None
+            raw = stored.raw_token_data.get("scope")
+            granted = raw.split() if isinstance(raw, str) else []
+            # Never label configured/requested scopes as actual grants.
+            return result.model_copy(update={
+                "scopes": granted,
+                "claims": {"sub": result.subject, "feishu_granted_scopes": granted},
+            })
+        except (ValueError, KeyError, TypeError, AttributeError):
+            return None
 
     def _create_upstream_oauth_client(self) -> Any:
         return FeishuTokenClient(self.feishu_settings)

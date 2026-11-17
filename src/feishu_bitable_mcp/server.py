@@ -18,6 +18,7 @@ from pydantic import Field
 
 from . import __version__
 from .auth import configured_auth
+from .change_policy import OPERATIONS
 from .client import FeishuClient
 from .config import BitableError, Settings, Target
 from .excel import read_excel
@@ -162,6 +163,69 @@ def build_server(settings: Settings, client: FeishuClient | None = None) -> Fast
                 return {"record": await api.create(target, values)}
 
             return await safe(create())
+
+    if settings.enable_changes:
+        from .change_adapters import ChangeAdapters
+        from .change_store import ChangeStore
+        from .changes import ChangeEngine
+
+        changes = ChangeEngine(settings, ChangeAdapters(api), ChangeStore(settings.change_ledger))
+
+        @mcp.tool(annotations=READ_ONLY, timeout=90)
+        async def prepare_change(
+            operation: Annotated[str, Field(json_schema_extra={"enum": list(OPERATIONS)})],
+            url: Annotated[str, Field(max_length=4096)],
+            payload: dict[str, Any],
+            request_id: Annotated[str, Field(min_length=8, max_length=100)],
+        ) -> dict[str, Any]:
+            """Preview a named, operator-allowlisted change without modifying Feishu.
+
+            Show the exact target/content to the user and obtain approval before commit_change.
+            Keep request_id stable across retries. No delete or arbitrary API operations.
+            Payloads by operation:
+            bitable.create_records: {records:[{fields:{field_name:value}}]};
+            bitable.update_records: {records:[{record_id,fields:{field_name:value}}]};
+            bitable.create_base: {name} at a folder URL;
+            bitable.create_table: {name,fields?:[{field_name,type,property?}]} at a Base URL;
+            bitable.create_field: {field_name,type,property?} at a table URL.
+            document.create: {title} at a folder URL;
+            document.insert_text: {paragraphs:[text],parent_block_id?,index?};
+            document.replace_text: {block_id,text} replaces one plain text block's inline styles.
+            sheets.create: {title} at a folder URL;
+            sheets.add_worksheet: {title,index?} at a workbook URL;
+            sheets.write_cells / append_cells: {range:"A1:B2",values:[[...]],sheet_id?};
+            sheets.format_cells: {range,style,sheet_id?}; style supports font, formatter,
+            hAlign, vAlign, foreColor, backColor.
+            Use {type:"formula",text:"=SUM(A1:A2)"} for formulas.
+            Append uses INSERT_ROWS, which can shift cells below the selected area.
+            excel.create: {file_name:"Example.xlsx",worksheets:[{name,values:[[...]]}]}, folder URL;
+            excel.edit: {file_name:"Example.xlsx",cells:[{sheet:"Sheet1",cell:"B2",value:...}]},
+            exact file URL, experimental overwrite requires operator setup. Formulas use objects.
+            """
+            return await safe(changes.prepare(operation, url, payload, request_id))
+
+        @mcp.tool(annotations=ToolAnnotations(
+            read_only_hint=False, destructive_hint=True, idempotent_hint=True,
+        ), timeout=90)
+        async def commit_change(
+            plan_id: str,
+            confirmation_digest: str,
+            confirm: Annotated[bool, Field(strict=True)] = False,
+        ) -> dict[str, Any]:
+            """Execute only an exact preview explicitly approved by the user.
+
+            The confirmation is a client attestation, not independent human-proof.
+            A durable receipt prevents repeating an uncertain request, including after restart.
+            """
+            return await safe(changes.commit(plan_id, confirmation_digest, confirm))
+
+        @mcp.tool(annotations=READ_ONLY)
+        async def get_change_status(request_id: str) -> dict[str, Any]:
+            """Read this actor's durable receipt; an unknown outcome must not be retried."""
+            try:
+                return changes.status(request_id)
+            except BitableError as exc:
+                raise ToolError(str(exc)) from None
 
     @mcp.tool(annotations=READ_ONLY, timeout=90)
     async def resolve_resource(

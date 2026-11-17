@@ -126,7 +126,7 @@ class FeishuClient:
                     continue
                 detail = (
                     " Write outcome is unknown; inspect records before retrying."
-                    if method == "POST" and route != TOKEN_ROUTE
+                    if method != "GET" and route != TOKEN_ROUTE
                     else ""
                 )
                 message = (
@@ -195,14 +195,14 @@ class FeishuClient:
         # Keep only this call's credentials, including its one optional read retry.
         # Other requests may replace the cached token before this response arrives.
         request_tokens = (used_token,)
-        context = "Feishu record creation failed" if method == "POST" else "Feishu read failed"
+        context = "Feishu mutation failed" if method != "GET" else "Feishu read failed"
         response = await self._send(
             method, route, headers={"Authorization": f"Bearer {used_token}"}, **kwargs
         )
         try:
             payload = self._payload(response, context)
         except BitableError as exc:
-            if method == "POST":
+            if method != "GET":
                 raise BitableError(
                     f"{exc} Write outcome is unknown; inspect records before retrying."
                 ) from None
@@ -221,14 +221,14 @@ class FeishuClient:
                 method, route, headers={"Authorization": f"Bearer {used_token}"}, **kwargs
             )
             payload = self._payload(response, context)
-        if method == "POST" and response.status_code >= 500:
+        if method != "GET" and response.status_code >= 500:
             context += "; write outcome may be unknown; inspect records before retrying"
         self._raise_api(response, payload, context, request_tokens=request_tokens)
         data = payload.get("data")
         if not isinstance(data, dict):
             detail = (
                 " Write outcome is unknown; inspect records before retrying."
-                if method == "POST"
+                if method != "GET"
                 else ""
             )
             raise BitableError("Feishu returned an invalid data object." + detail)

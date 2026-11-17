@@ -21,3 +21,4 @@ private/
 # Do not commit OAuth state if FASTMCP_HOME points inside the checkout.
 .fastmcp/
 oauth-proxy/
+.state/

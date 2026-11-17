@@ -3,13 +3,14 @@
 [English](README.en.md) | **简体中文** | [日本語](README.ja.md)
 
 > **开发候选 v0.2.0rc1：** 飞书个人授权、云文档、在线电子表格及云盘 Excel 读取。模拟授权与读取测试已通过；真实飞书和 ChatGPT 浏览器验收仍待进行。已发布 v0.1.1 不包含这些新增能力。
+> **本分支后续开发（尚未发布）：** 新增四类资源的受限写入/创建，以及默认关闭的预览、确认与持久回执。详见[操作与边界](docs/changes.md)和[官方 API 核对](docs/write-api-review.md)。现有 `v0.2.0-rc.1` 安装包也不包含这部分更改。
 >
 > **版本说明：** 当前仅支持 Feishu 中国版。Lark 国际版使用独立 API 域名和应用凭据，尚未在本项目中实现或验证；不能仅修改名称就声称兼容。两者的品牌关系不代表凭证与数据跨区域互通。
 
 [![CI](https://github.com/a2681220474-glitch/feishu-bitable-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/a2681220474-glitch/feishu-bitable-mcp/actions/workflows/ci.yml)
 
 通过飞书链接读取多维表格、云文档、在线电子表格和云盘 `.xlsx` 的轻量 Python MCP 服务。
-默认只读；可选开启有表白名单和字段校验的单条记录创建。
+默认只读；开发分支可选开启按操作及资源白名单控制的预览/确认写入。
 
 ## 开源使用与配置
 
@@ -21,8 +22,8 @@
 
 这个项目源于一个真实的使用场景：**把飞书多维表格链接直接发给 ChatGPT，让获得授权的 MCP 工具读取表结构与记录，辅助分析数据，而不必反复导出 Excel 或手工调用飞书 API。** 这是项目的目标场景，不意味着 v0.1.0 已重新完成 ChatGPT 网页端到端兼容性验证。
 
-- **当前已实现（Feishu 中国版）：** 读取表信息、字段结构、分页记录、文档块、工作表与单元格、云盘 Excel。用户模式只读；应用身份模式可按既有保护启用单条记录创建。
-- **尚未实现：** 修改已有记录、创建数据表、编辑普通飞书云文档。
+- **当前开发分支已实现（Feishu 中国版，Mock 验证）：** 四类资源读取；按需启用多维表格批量新增/更新和建 Base/表/基础字段、文档创建/文本块插入与替换、在线表格创建/工作表新增/值与公式/追加/基础格式、XLSX 创建上传和受限单元格修改。个人 OAuth 和应用身份均保留，写入先预览再确认。
+- **仍有限制：** 不支持复杂文档块编辑、全部字段类型、完整表重建或严格原子并发锁；XLSX 同 token 覆盖为额外关闭的实验路径，尚需真实接口验收。没有删除工具。
 - **Lark 国际版尚不支持：** 当前仅使用 `open.feishu.cn` API 与 `*.feishu.cn` Base 链接，不接受国际版域名或凭据。国际版需独立实现并验证后才能声明支持。
 
 公开版 v0.1.0 的自动化测试使用虚拟数据和 Mock API；曾成功读写真实飞书测试表的是**较早的私有原型**，不能等同于公开版已完成生产环境验收。
@@ -45,6 +46,9 @@
 | `read_spreadsheet` | `url, range="A1:T100", sheet_id=None, render="ToString"` | 每次最多 5000 单元格；Formula 模式读取公式 |
 | `read_excel_file` | `url, sheet=None, start_row=1, rows=100, start_column=1, columns=20, data_only=false` | 云盘 .xlsx 的工作表、值/类型/数字格式与行游标 |
 | `create_record` | `url, fields, confirm=false` | 默认不注册；配置允许后创建一条记录 |
+| `prepare_change` | `operation, url, payload, request_id` | 新模式默认不注册；只读预览具名操作，返回精确内容和确认摘要 |
+| `commit_change` | `plan_id, confirmation_digest, confirm=false` | 新模式确认后一次派发，失败或超时保留持久回执 |
+| `get_change_status` | `request_id` | 查询当前身份的操作状态，避免不确定结果重复创建 |
 
 - Base 工具接受 `https://*.feishu.cn/base/<app_token>?table=<table_id>`，`view` 可选。新增工具接受 `/docx/`、`/sheets/`、`/file/`、`/drive/file/` 和指向相应资源的 `/wiki/` 链接。Wiki Base 可先解析类型与 token，再使用带 table 的标准 Base URL。不支持短链接、BaseApp 和 Lark 国际版。
 - 服务只从 URL 提取 ID，API 请求目的地固定为 `open.feishu.cn`。
@@ -58,7 +62,7 @@
 - 文档按 page_token 续读；嵌入图片、附件、画板等保留引用，不自动下载或渲染。
 - 在线表格按显式矩形窗口读取，不声称已获取整个工作簿或完整样式。
 - 云盘 Excel 限普通 .xlsx：下载 20 MiB、展开 100 MiB、窗口 5000 单元格；不执行公式/宏。data_only 读取已保存缓存，可能缺失或过期；不支持 .xls、宏工作簿、加密文件或本机路径。
-- 没有更新、删除、批量写入、建表或修改字段工具。
+- 新模式仅开放[列出的具名操作](docs/changes.md)，不开放删除或任意 API；既有字段类型/结构修改不在本轮范围。
 
 以下 URL、字段和记录均为虚构示例，不能用于真实 API 调用：
 
@@ -91,7 +95,7 @@ Windows PowerShell 激活：`.venv\Scripts\Activate.ps1`。向导询问自己的
 
 ## 可选：创建一条记录
 
-用户模式只读。应用身份模式默认也不含 `create_record`；操作者须同时设置：
+以下为旧应用模式的兼容路径，不具备新模式的持久回执与防重复保证；新部署推荐[预览/确认流程](docs/changes.md)，不要同时开启两种写入开关。应用身份模式默认不含 `create_record`；操作者须同时设置：
 
 ```dotenv
 FEISHU_AUTH_MODE=app

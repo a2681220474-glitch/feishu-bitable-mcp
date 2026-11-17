@@ -23,38 +23,72 @@ from feishu_bitable_mcp.user_auth import (
 )
 
 
-async def test_complete_synthetic_oauth_consent_code_pkce_and_mcp_read(monkeypatch):
+@pytest.mark.parametrize("granted_scope", [None, "bitable:app:readonly", "base:record:create"])
+async def test_complete_synthetic_oauth_consent_code_pkce_and_mcp_read(
+    monkeypatch, tmp_path, granted_scope
+):
     from feishu_bitable_mcp import server
 
-    policy = settings()
+    target = "https://example.feishu.cn/base/DemoBaseToken0001?table=tblDemoTable01"
+    policy = settings(
+        enable_changes=True,
+        change_policy={"bitable.create_records": [target]},
+        change_ledger=str(tmp_path / "receipts.db"),
+        user_scopes=Settings.__dataclass_fields__["user_scopes"].default + ("base:record:create",),
+    )
     upstream_calls = []
     blocked = [False]
 
     def upstream(request):
         upstream_calls.append(request)
         if str(request.url) == TOKEN_URL:
-            return httpx.Response(200, json={
-                "code": 0, "access_token": "fictional-person-token", "expires_in": 7200,
-                "refresh_token": "fictional-refresh-token", "refresh_token_expires_in": 86400,
-                "scope": " ".join(policy.user_scopes),
-            })
+            return httpx.Response(
+                200,
+                json={
+                    "code": 0,
+                    "access_token": "fictional-person-token",
+                    "expires_in": 7200,
+                    "refresh_token": "fictional-refresh-token",
+                    "refresh_token_expires_in": 86400,
+                }
+                | ({"scope": granted_scope} if granted_scope is not None else {}),
+            )
         if request.url.path.endswith("/user_info"):
             if blocked[0]:
                 return httpx.Response(401, json={"code": 99991668, "msg": "Revoked"})
             return httpx.Response(200, json={"code": 0, "data": {"open_id": "fictional-user"}})
         assert request.method == "GET"
         assert request.headers["authorization"] == "Bearer fictional-person-token"
-        return httpx.Response(200, json={"code": 0, "data": {
-            "items": [{"block_id": "fictional-block", "text": {"elements": []}}],
-            "has_more": False,
-        }})
+        if request.url.path.endswith("/fields"):
+            return httpx.Response(
+                200,
+                json={
+                    "code": 0,
+                    "data": {
+                        "items": [{"field_name": "Title", "type": 1}],
+                        "has_more": False,
+                    },
+                },
+            )
+        return httpx.Response(
+            200,
+            json={
+                "code": 0,
+                "data": {
+                    "items": [{"block_id": "fictional-block", "text": {"elements": []}}],
+                    "has_more": False,
+                },
+            },
+        )
 
     transport = httpx.MockTransport(upstream)
     provider = FeishuProvider(policy, client_storage=MemoryStore())
     provider._token_validator = FeishuUserVerifier(list(policy.user_scopes), transport=transport)
-    monkeypatch.setattr(provider, "_create_upstream_oauth_client", lambda: FeishuTokenClient(
-        policy, transport=transport
-    ))
+    monkeypatch.setattr(
+        provider,
+        "_create_upstream_oauth_client",
+        lambda: FeishuTokenClient(policy, transport=transport),
+    )
     monkeypatch.setattr(server, "configured_auth", lambda _: provider)
     api = FeishuClient(policy, transport=transport)
     app = server.build_server(policy, api).http_app(
@@ -62,33 +96,46 @@ async def test_complete_synthetic_oauth_consent_code_pkce_and_mcp_read(monkeypat
     )
     callback = "https://chatgpt.com/connector/oauth/synthetic"
     verifier = "synthetic-pkce-verifier-" + "x" * 43
-    challenge = base64.urlsafe_b64encode(
-        hashlib.sha256(verifier.encode()).digest()
-    ).rstrip(b"=").decode()
+    challenge = (
+        base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    )
     async with app.router.lifespan_context(app):
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app), base_url="https://mcp.example.com"
         ) as browser:
-            registration = await browser.post("/register", json={
-                "client_name": "Synthetic ChatGPT", "redirect_uris": [callback],
-                "token_endpoint_auth_method": "none", "response_types": ["code"],
-                "grant_types": ["authorization_code", "refresh_token"],
-            })
+            registration = await browser.post(
+                "/register",
+                json={
+                    "client_name": "Synthetic ChatGPT",
+                    "redirect_uris": [callback],
+                    "token_endpoint_auth_method": "none",
+                    "response_types": ["code"],
+                    "grant_types": ["authorization_code", "refresh_token"],
+                },
+            )
             assert registration.status_code == 201, registration.text
             client_id = registration.json()["client_id"]
-            start = await browser.get("/authorize", params={
-                "client_id": client_id, "redirect_uri": callback, "response_type": "code",
-                "code_challenge": challenge, "code_challenge_method": "S256",
-                "state": "synthetic-client-state", "scope": " ".join(policy.user_scopes),
-                "resource": policy.public_url,
-            })
+            start = await browser.get(
+                "/authorize",
+                params={
+                    "client_id": client_id,
+                    "redirect_uri": callback,
+                    "response_type": "code",
+                    "code_challenge": challenge,
+                    "code_challenge_method": "S256",
+                    "state": "synthetic-client-state",
+                    "scope": " ".join(policy.user_scopes),
+                    "resource": policy.public_url,
+                },
+            )
             assert start.status_code in {302, 307}, start.text
             consent = await browser.get(start.headers["location"])
             assert consent.status_code == 200
             fields = dict(re.findall(r'name="(txn_id|csrf_token)" value="([^"]+)"', consent.text))
             assert set(fields) == {"txn_id", "csrf_token"}
             approve = await browser.post(
-                str(consent.url), data=fields | {"action": "approve"},
+                str(consent.url),
+                data=fields | {"action": "approve"},
                 headers={"Origin": "https://mcp.example.com"},
             )
             assert approve.status_code in {302, 303, 307}, approve.text
@@ -100,31 +147,78 @@ async def test_complete_synthetic_oauth_consent_code_pkce_and_mcp_read(monkeypat
             )
             assert done.status_code in {302, 303, 307}, done.text
             client_code = parse_qs(urlsplit(done.headers["location"]).query)["code"][0]
-            token_response = await browser.post("/token", data={
-                "grant_type": "authorization_code", "client_id": client_id,
-                "code": client_code, "redirect_uri": callback, "code_verifier": verifier,
-                "resource": policy.public_url,
-            })
+            token_response = await browser.post(
+                "/token",
+                data={
+                    "grant_type": "authorization_code",
+                    "client_id": client_id,
+                    "code": client_code,
+                    "redirect_uri": callback,
+                    "code_verifier": verifier,
+                    "resource": policy.public_url,
+                },
+            )
             assert token_response.status_code == 200, token_response.text
             assert "fictional-person-token" not in token_response.text
             assert "fictional-refresh-token" not in token_response.text
             access = token_response.json()["access_token"]
-            result = await browser.post("/mcp", headers={
-                "Authorization": f"Bearer {access}",
-                "Accept": "application/json, text/event-stream",
-            }, json={"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {
-                "name": "read_document", "arguments": {
-                    "url": "https://example.feishu.cn/docx/DocxDemoToken0001",
+            result = await browser.post(
+                "/mcp",
+                headers={
+                    "Authorization": f"Bearer {access}",
+                    "Accept": "application/json, text/event-stream",
                 },
-            }})
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "read_document",
+                        "arguments": {
+                            "url": "https://example.feishu.cn/docx/DocxDemoToken0001",
+                        },
+                    },
+                },
+            )
             assert result.status_code == 200, result.text
             assert result.json()["result"]["isError"] is False
             assert "fictional-person-token" not in result.text
-            refreshed = await browser.post("/token", data={
-                "grant_type": "refresh_token", "client_id": client_id,
-                "refresh_token": token_response.json()["refresh_token"],
-            })
+            loaded = await provider.load_access_token(access)
+            assert loaded.scopes == (granted_scope.split() if granted_scope else [])
+            assert loaded.claims["feishu_granted_scopes"] == loaded.scopes
+            preview = await browser.post(
+                "/mcp",
+                headers={
+                    "Authorization": f"Bearer {access}",
+                    "Accept": "application/json, text/event-stream",
+                },
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 3,
+                    "method": "tools/call",
+                    "params": {
+                        "name": "prepare_change",
+                        "arguments": {
+                            "operation": "bitable.create_records",
+                            "url": target,
+                            "payload": {"records": [{"fields": {"Title": "Fictional"}}]},
+                            "request_id": "scope-check-001",
+                        },
+                    },
+                },
+            )
+            assert preview.json()["result"]["isError"] is (granted_scope != "base:record:create")
+            refreshed = await browser.post(
+                "/token",
+                data={
+                    "grant_type": "refresh_token",
+                    "client_id": client_id,
+                    "refresh_token": token_response.json()["refresh_token"],
+                },
+            )
             assert refreshed.status_code == 200, refreshed.text
+            refreshed_loaded = await provider.load_access_token(refreshed.json()["access_token"])
+            assert refreshed_loaded.scopes == (granted_scope.split() if granted_scope else [])
             assert "fictional-refresh-token" not in refreshed.text
             assert any(
                 r.url.path.endswith("/oauth/token")
@@ -132,10 +226,14 @@ async def test_complete_synthetic_oauth_consent_code_pkce_and_mcp_read(monkeypat
                 for r in upstream_calls
             )
             blocked[0] = True
-            revoked = await browser.post("/mcp", headers={
-                "Authorization": f"Bearer {refreshed.json()['access_token']}",
-                "Accept": "application/json, text/event-stream",
-            }, json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
+            revoked = await browser.post(
+                "/mcp",
+                headers={
+                    "Authorization": f"Bearer {refreshed.json()['access_token']}",
+                    "Accept": "application/json, text/event-stream",
+                },
+                json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+            )
             assert revoked.status_code == 401
     assert not any(r.url.path.endswith("/internal") for r in upstream_calls)
 

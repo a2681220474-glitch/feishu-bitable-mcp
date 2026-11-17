@@ -10,7 +10,7 @@ A self-hosted Feishu MCP server for Bitable, cloud documents, online spreadsheet
 
 Each deployer uses their own Feishu app, credentials, account and HTTPS service. Approval from the maintainer is not required. No OpenAI API key is needed. Feishu app setup and a reachable MCP service are still necessary; publishing source code does not provide hosting.
 
-In user mode, ChatGPT starts a Feishu OAuth login through the SDK proxy. Each request uses its authenticated user's credential. Refresh is supported; when revoked or no longer refreshable, reconnect and sign in. Effective access remains subject to user permissions, granted app scopes and enterprise policy. User mode is read-only.
+In user mode, ChatGPT starts a Feishu OAuth login through the SDK proxy. Each request uses its authenticated user's credential. Refresh is supported; when revoked or no longer refreshable, reconnect and sign in. Effective access remains subject to user permissions, granted app scopes and enterprise policy. Read-only by default. This branch adds opt-in preview/commit operations with actual granted-scope checks; see [mutation guide](docs/changes.md) and [official API review](docs/write-api-review.md) (Chinese). These additions are not included in the published v0.2.0-rc.1 artifacts and still need live acceptance testing.
 
 ## Tools
 
@@ -26,7 +26,7 @@ In user mode, ChatGPT starts a Feishu OAuth login through the SDK proxy. Each re
 | read_spreadsheet | Explicit rectangle, up to 5000 cells; value/formula rendering |
 | read_excel_file | Uploaded Drive .xlsx worksheet values/types/formats and row cursor |
 
-App identity remains available for existing deployments. Optional create_record retains authentication, allowlisting, field validation and confirmation requirements; it cannot be enabled in user mode. No update/delete/schema mutation tools are provided.
+App identity remains available. Legacy create_record stays app-only and cannot be combined with the new preview/commit mode. The development branch adds bounded Bitable batch create/update and basic schema creation, Docx creation/text insertion/replacement, online Sheets creation/worksheet/value/formula/append/basic formatting, and XLSX creation or restricted cell edits. Experimental same-token XLSX overwrite needs extra operator setup. No deletion tools or arbitrary API forwarding. Complex blocks, advanced field writes, complete reconstruction and atomic concurrency guarantees are outside the implemented scope.
 
 ## Install and connect
 
