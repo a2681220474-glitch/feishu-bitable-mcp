@@ -2,6 +2,10 @@
 
 ## Post-rc1 development — unreleased
 
+- Raise existing transitive dependency floors to dnspython 2.9.2 and opentelemetry-api
+  1.45.2, regenerate hashes, and protect both locked and ordinary installs against
+  [CVE-2026-128089](https://github.com/rthalley/dnspython/security/advisories/GHSA-vvf4-9x63-8xvv)
+  and [CVE-2026-126360](https://github.com/open-telemetry/opentelemetry-python/security/advisories/GHSA-mf5v-w3w3-f6cg).
 - Add opt-in named changes across Bitable, Docx, online Sheets and Drive XLSX through
   prepare_change / commit_change / get_change_status. Existing read-only defaults stay intact.
 - Separate operation/resource allowlists and actual user-granted scopes; do not infer

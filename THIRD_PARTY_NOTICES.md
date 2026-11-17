@@ -19,6 +19,8 @@ code provenance alone cannot determine employment or other contractual obligatio
 | python-dotenv | 1.2.4 | BSD-3-Clause | https://github.com/theskumar/python-dotenv |
 | openpyxl | 3.1.5 | MIT | https://openpyxl.readthedocs.io/ |
 | defusedxml | 0.7.1 | PSF-2.0 | https://github.com/tiran/defusedxml |
+| dnspython (existing transitive dependency, security floor) | 2.9.2 | ISC | https://github.com/rthalley/dnspython |
+| opentelemetry-api (existing transitive dependency, security floor) | 1.45.2 | Apache-2.0 | https://github.com/open-telemetry/opentelemetry-python |
 
 ## Runtime dependency review
 
