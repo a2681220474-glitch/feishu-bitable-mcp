@@ -125,6 +125,7 @@ def build_server(settings: Settings, client: FeishuClient | None = None) -> Fast
                 "field_count": len(fields),
                 "primary_field": next((x for x in fields if x.get("is_primary")), None),
                 "record_count": records.get("total"),
+                "observed_record_count": records.get("observed_record_count"),
                 "sample_records": records["records"],
                 "has_more": records["has_more"],
                 "page_token": records["page_token"],
@@ -231,10 +232,12 @@ def build_server(settings: Settings, client: FeishuClient | None = None) -> Fast
     async def resolve_resource(
         url: Annotated[str, Field(max_length=4096)],
     ) -> dict[str, Any]:
-        """Resolve a Feishu document, spreadsheet, uploaded file or Wiki URL to its true type."""
-        from dataclasses import asdict
+        """Resolve a resource/Wiki link and return a direct resource_url for subsequent tools.
 
-        return asdict(await safe(resources.resolve(url)))
+        A Wiki Base also returns visible table URLs; choose the intended table explicitly.
+        Writes still require the operator to allowlist the exact direct target URL.
+        """
+        return await safe(resources.describe(url))
 
     @mcp.tool(annotations=READ_ONLY, timeout=90)
     async def read_document(

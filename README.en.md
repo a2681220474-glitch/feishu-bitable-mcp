@@ -4,13 +4,13 @@
 
 A self-hosted Feishu MCP server for Bitable, cloud documents, online spreadsheets and uploaded Excel files. The original goal was to give ChatGPT a Feishu table URL and analyze its data without repeatedly exporting Excel.
 
-**Development candidate 0.2.0rc1:** Feishu user login and the new document/Excel tools are implemented and tested with synthetic APIs. Real Feishu + ChatGPT browser acceptance is pending. Published v0.1.1 does not contain these additions. This community project is not an official Feishu or OpenAI product; international Lark is unsupported.
+**Development candidate 0.2.0rc1:** Feishu user login and the new document/Excel tools are implemented and tested with synthetic APIs. A later development snapshot has [live business-API validation](docs/live-validation.md); ChatGPT browser OAuth acceptance remains pending. Published v0.1.1 does not contain these additions. This community project is not an official Feishu or OpenAI product; international Lark is unsupported.
 
 ## Independent deployment
 
 Each deployer uses their own Feishu app, credentials, account and HTTPS service. Approval from the maintainer is not required. No OpenAI API key is needed. Feishu app setup and a reachable MCP service are still necessary; publishing source code does not provide hosting.
 
-In user mode, ChatGPT starts a Feishu OAuth login through the SDK proxy. Each request uses its authenticated user's credential. Refresh is supported; when revoked or no longer refreshable, reconnect and sign in. Effective access remains subject to user permissions, granted app scopes and enterprise policy. Read-only by default. This branch adds opt-in preview/commit operations with actual granted-scope checks; see [mutation guide](docs/changes.md) and [official API review](docs/write-api-review.md) (Chinese). These additions are not included in the published v0.2.0-rc.1 artifacts and still need live acceptance testing.
+In user mode, ChatGPT starts a Feishu OAuth login through the SDK proxy. Each request uses its authenticated user's credential. Refresh is supported; when revoked or no longer refreshable, reconnect and sign in. Effective access remains subject to user permissions, granted app scopes and enterprise policy. Read-only by default. This branch adds opt-in preview/commit operations with actual granted-scope checks; see [mutation guide](docs/changes.md) and [official API review](docs/write-api-review.md) (Chinese). These additions are not included in the published v0.2.0-rc.1 artifacts. Fifteen operations were exercised against authorized test resources via a private CLI-authenticated transport; the public browser OAuth flow remains unverified.
 
 ## Tools
 
@@ -20,7 +20,7 @@ In user mode, ChatGPT starts a Feishu OAuth login through the SDK proxy. Each re
 | list_fields | All field pages and raw properties |
 | list_records | One record page plus continuation cursor |
 | inspect_table | Schema, metadata and first-page samples |
-| resolve_resource | Resource type/token, including Wiki resolution |
+| resolve_resource | Type/token and usable direct URLs; Wiki Base table discovery respects read policy |
 | read_document | One page of raw docx blocks with styles/tree references |
 | get_spreadsheet_info | Spreadsheet and all worksheet properties |
 | read_spreadsheet | Explicit rectangle, up to 5000 cells; value/formula rendering |
@@ -47,6 +47,6 @@ The wizard privately saves your app ID/secret and public HTTPS /mcp URL without 
 
 Follow pagination/windows explicitly. Document blocks preserve embedded object references but do not render/download them automatically. Online Sheets reads do not promise complete styling. Excel accepts ordinary uploaded .xlsx files (20 MiB download, 100 MiB expanded ZIP, 5000 cells/window), without formula/macro execution. Cached formula values can be missing or stale. Legacy .xls, macro/encrypted workbooks and local computer paths are unsupported.
 
-Tests use synthetic records, signed-token/JWKS fixtures and a complete mocked Feishu OAuth flow covering consent, PKCE, refresh, revocation and user isolation. They do not prove tenant permissions or live ChatGPT compatibility. Historical live read/write tests belong to an older private prototype, not this release.
+Tests use synthetic records, signed-token/JWKS fixtures and a complete mocked Feishu OAuth flow covering consent, PKCE, refresh, revocation and user isolation. They do not prove tenant permissions or live ChatGPT compatibility. Historical ChatGPT live tests belong to the private prototype. The 2026-11-18 development-branch business-API smoke tests are separately documented and do not prove the new browser OAuth flow.
 
 Never publish .env, OAuth state, tokens or business data. See [security](SECURITY.md), [contributing](CONTRIBUTING.md), [changes](CHANGELOG.md), and [MIT license](LICENSE). The official [Feishu CLI](https://github.com/larksuite/cli) and [OpenAPI MCP](https://github.com/larksuite/lark-openapi-mcp) have broader coverage; this project keeps a small URL-oriented tool surface and explicit read budgets.

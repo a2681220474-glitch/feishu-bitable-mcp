@@ -13,6 +13,14 @@ class BitableError(Exception):
     """A safe, user-facing error. Never include request headers or raw responses."""
 
 
+GRANULAR_READ_SCOPES = frozenset({
+    "base:app:read", "base:table:read", "base:field:read", "base:record:read",
+    "base:record:retrieve", "base:view:read", "sheets:spreadsheet.meta:read",
+    "sheets:spreadsheet:read", "drive:file:download", "drive:drive.metadata:readonly",
+    "wiki:node:retrieve", "wiki:node:read",
+})
+
+
 @dataclass(frozen=True)
 class Target:
     app_token: str
@@ -108,7 +116,9 @@ class Settings:
                     "User mode requires MCP_PUBLIC_URL; disable legacy writes and "
                     "leave MCP_AUTH_TOKEN empty. Use preview/commit for enabled changes."
                 )
-            allowed = set(type(self).__dataclass_fields__["user_scopes"].default)
+            allowed = (
+                set(type(self).__dataclass_fields__["user_scopes"].default) | GRANULAR_READ_SCOPES
+            )
             if self.enable_changes:
                 from .change_policy import WRITE_SCOPES
 

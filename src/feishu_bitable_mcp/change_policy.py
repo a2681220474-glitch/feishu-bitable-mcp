@@ -16,7 +16,7 @@ class Operation:
     scopes: tuple[str, ...]
 
 
-# Confirmed against official Markdown API specifications; see docs/write-api-review.md.
+# Official API/CLI sources and scoped live smoke tests; see docs/write-api-review.md.
 OPERATIONS = {
     "bitable.create_records": Operation("write", "table", ("base:record:create", "bitable:app")),
     "bitable.update_records": Operation("write", "table", ("base:record:update", "bitable:app")),
@@ -35,10 +35,26 @@ OPERATIONS = {
         "folder",
         ("sheets:spreadsheet:create", "sheets:spreadsheet", "drive:drive"),
     ),
-    "sheets.add_worksheet": Operation("create", "sheets", ("sheets:spreadsheet", "drive:drive")),
-    "sheets.write_cells": Operation("write", "sheets", ("sheets:spreadsheet", "drive:drive")),
-    "sheets.append_cells": Operation("write", "sheets", ("sheets:spreadsheet", "drive:drive")),
-    "sheets.format_cells": Operation("write", "sheets", ("sheets:spreadsheet", "drive:drive")),
+    "sheets.add_worksheet": Operation(
+        "create",
+        "sheets",
+        ("sheets:spreadsheet:write_only", "sheets:spreadsheet", "drive:drive"),
+    ),
+    "sheets.write_cells": Operation(
+        "write",
+        "sheets",
+        ("sheets:spreadsheet:write_only", "sheets:spreadsheet", "drive:drive"),
+    ),
+    "sheets.append_cells": Operation(
+        "write",
+        "sheets",
+        ("sheets:spreadsheet:write_only", "sheets:spreadsheet", "drive:drive"),
+    ),
+    "sheets.format_cells": Operation(
+        "write",
+        "sheets",
+        ("sheets:spreadsheet:write_only", "sheets:spreadsheet", "drive:drive"),
+    ),
     "excel.create": Operation(
         "create", "folder", ("drive:file:upload", "drive:file", "drive:drive")
     ),

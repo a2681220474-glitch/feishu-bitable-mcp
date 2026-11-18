@@ -346,7 +346,7 @@ class ExcelChanges:
                 "atomic_compare_and_swap": False,
                 "note": "No formulas executed. Recalculate in Excel to refresh caches. Uses "
                 "the official CLI's file_token transport, not document version creation. "
-                "This transport still needs live acceptance testing; external writers may race.",
+                "Experimental overwrite: verify in your deployment; external writers may race.",
             },
         }
 

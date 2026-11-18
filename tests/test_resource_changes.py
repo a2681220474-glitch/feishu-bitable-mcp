@@ -326,3 +326,40 @@ async def test_preview_return_value_cannot_mutate_the_dispatched_payload(api_con
     plan["exact_content"]["values"][0][0] = 100
     await engine.commit(plan["plan_id"], plan["confirmation_digest"], True)
     assert state["writes"][0][1]["valueRange"]["values"] == [[1, 2]]
+
+
+def test_granular_sheet_write_grant_stays_opt_in_and_resource_scoped(tmp_path, monkeypatch):
+    from fastmcp.server import dependencies
+    from fastmcp.server.auth import AccessToken
+
+    options = dict(
+        identity="user",
+        public_url="https://mcp.example.com/mcp",
+        user_scopes=("sheets:spreadsheet:write_only",),
+    )
+    with pytest.raises(BitableError, match="documented enabled scopes"):
+        Settings("fictional-app", "fictional-secret", **options)
+    settings = Settings(
+        "fictional-app",
+        "fictional-secret",
+        **options,
+        enable_changes=True,
+        change_policy={"sheets.write_cells": [SHEET]},
+    )
+    monkeypatch.setattr(
+        dependencies,
+        "get_access_token",
+        lambda: AccessToken(
+            token="fictional-user",
+            client_id="test",
+            subject="owner-one",
+            scopes=[],
+            claims={"feishu_granted_scopes": ["sheets:spreadsheet:write_only"]},
+        ),
+    )
+    engine = ChangeEngine(settings, None, ChangeStore(str(tmp_path / "receipts.db")))
+    assert engine.actor(OPERATIONS["sheets.write_cells"])
+    with pytest.raises(BitableError, match="actually granted"):
+        engine.actor(OPERATIONS["bitable.create_records"])
+    with pytest.raises(BitableError, match="not operator-authorized"):
+        authorize(settings.change_policy, "sheets.write_cells", SHEET.replace("demo01", "other01"))

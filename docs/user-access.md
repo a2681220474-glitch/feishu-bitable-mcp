@@ -12,6 +12,19 @@
 
 有效范围受用户自身权限、用户同意、应用 API 权限和企业策略约束，不能承诺覆盖所有网页内容。用户模式默认只注册读取工具。开发分支可按[预览/确认配置](changes.md)开启明确资源上的写入和创建；实际授予 Scope 不足时拒绝，不把申请权限当成授予权限。
 
+## 细粒度读取权限
+
+保留旧配置兼容。应用使用细粒度权限时，可在私有 `.env` 明确配置需要的读取 Scope，例如：
+
+```dotenv
+FEISHU_USER_SCOPES=base:app:read base:table:read base:field:read base:record:read base:view:read docx:document:readonly sheets:spreadsheet.meta:read sheets:spreadsheet:read drive:drive.metadata:readonly drive:file:download wiki:node:retrieve offline_access
+```
+
+实际 scope 仍须在飞书应用及用户同意中获得。只有实际持有 `base:record:read`、没有旧记录读取 Scope 的用户请求才自动选 Base v3 读取；应用身份和旧授权继续使用原接口。
+v3 保留原矩阵、字段 ID/类型和元数据，同时提供 record_id/fields；分页游标绑定用户、表、视图与 revision。请求超过 200 行时返回明确的 effective_page_size，继续跟随 page_token。
+`total` 仅在上游提供时返回；`observed_record_count` 是末页累计位置，不是伪造的 API 总数。外部编辑导致版本变化时需重新分页。
+写入的细粒度权限、白名单和开关另见 [changes.md](changes.md)，读取 Scope 不能授权写入。
+
 ## 兼容：应用身份
 
 `FEISHU_AUTH_MODE=app` 保留企业自建应用模式。应用需获得目标资源权限；人的访问权不会自动传给应用。远程实例需配置适合客户端的 MCP 鉴权。旧记录创建仅在该模式按既有保护开启；新模式通过互斥开关统一预览/确认，兼容应用和个人身份。
@@ -26,4 +39,4 @@ ChatGPT 网页端必须能从其网络访问服务。自己的电脑加 HTTPS �
 
 ## 验证状态
 
-开发分支已经通过模拟的完整链路：注册、同意、PKCE、授权码交换、MCP 读取、刷新、撤销后拒绝，以及并发用户隔离。真实飞书应用和 ChatGPT 浏览器验收仍待进行；Mock 不证明某租户权限或所有视图行为。
+开发分支已经通过模拟的完整链路：注册、同意、PKCE、授权码交换、MCP 读取、刷新、撤销后拒绝，以及并发用户隔离。开发分支另通过现有本人授权和专用传输桥完成[真实业务接口验证](live-validation.md)；新版公网 OAuth/ChatGPT 浏览器验收仍待进行，不能用业务接口或 Mock 结果冒充端到端成功。

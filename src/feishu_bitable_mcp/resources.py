@@ -73,6 +73,33 @@ class ResourceClient:
             resource = Resource(kind, token, resource.sheet_id)
         return resource
 
+    async def describe(self, url: str):
+        resource = await self.resolve(url)
+        route_kind = "base" if resource.kind == "bitable" else resource.kind
+        direct = f"https://{urlsplit(url).hostname}/{route_kind}/{resource.token}"
+        if resource.kind == "sheets" and resource.sheet_id:
+            direct += "?sheet=" + resource.sheet_id
+        result = {
+            "kind": resource.kind, "token": resource.token, "sheet_id": resource.sheet_id,
+            "resource_url": direct,
+        }
+        if resource.kind == "bitable":
+            allowed = self.api.settings.read_tables
+            if allowed and not any(app == resource.token for app, _ in allowed):
+                raise BitableError("This Base is outside FEISHU_READ_TABLE_URLS.")
+            tables = await self.api.all_items(f"/bitable/v1/apps/{resource.token}/tables")
+            visible = []
+            for table in tables:
+                table_id = table.get("table_id")
+                if not isinstance(table_id, str) or not re.fullmatch(
+                    r"tbl[A-Za-z0-9]{7,100}", table_id
+                ):
+                    raise BitableError("Feishu returned an invalid table ID.")
+                if not allowed or (resource.token, table_id) in allowed:
+                    visible.append({**table, "url": direct + "?table=" + table_id})
+            result["tables"] = visible
+        return result
+
     async def document(self, url: str, page_size: int, page_token: str | None):
         resource = await self.resolve(url)
         if resource.kind != "docx":

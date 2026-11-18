@@ -1,5 +1,8 @@
 # 写接口与 Scope 核对
 
+2026-11-18 补充：[真实接口验收](live-validation.md)确认了细粒度用户授权下的 Base v3 读取及 Sheets 写权限兼容。
+`sheets:spreadsheet:write_only` 已验证可用于本项目现有工作表、值、追加和样式操作；公开接口页仍列旧的宽权限，以下表格保留其原始声明。
+
 核对日期：2026-11-17。来源为飞书官方 [Markdown 文档索引](https://open.feishu.cn/llms-docs/zh-CN/llms-docs.txt) 对应的完整接口页，以及官方 CLI 的实际源码。
 下列路径均在 `https://open.feishu.cn/open-apis` 下；Scope 列为可选其一，不能把本地允许列表等同于飞书授予。
 支持 tenant_access_token / user_access_token 的文档接口均保留两种显式身份；无降级回退。
@@ -29,7 +32,7 @@ Scope 是接口级要求；同一个 Scope 不一定意味着用户拥有目标�
 ## XLSX 覆盖证据与限制
 
 公开 `upload_all` 参数表未列出 file_token，但 [官方 CLI 的固定源码](https://github.com/larksuite/cli/blob/8a7fa53355d5ec27df06ec8b36152ca7c35919fc/shortcuts/drive/drive_upload.go) 明确提供 `--file-token` 并在 multipart 上传中加入该字段。
-适配器实现同样的传输，并核对返回 token 等于原文件；因缺少本项目真实验收，必须额外配置目录才启用实验性覆盖。
+适配器实现同样的传输，并核对返回 token 等于原文件；同 token 覆盖已在虚构样本验收，仍必须额外配置目录才启用实验性覆盖。
 不会执行 CLI 中可能存在的后续自动 ACL 授权步骤，也不会修改已有文件权限。
 
 [创建文档版本](https://open.feishu.cn/document/server-docs/docs/drive-v1/file-version/create.md) 的 obj_type 只列 docx / sheet，不适用于上传的 XLSX。

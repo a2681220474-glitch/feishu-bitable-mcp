@@ -289,6 +289,14 @@ class FeishuClient:
             not isinstance(page_token, str) or not 1 <= len(page_token) <= 4096
         ):
             raise BitableError("page_token must be a nonempty string of at most 4096 characters.")
+        from .base_v3 import granular_records, records
+
+        if granular_records(
+            self.settings, continuing=bool(page_token and page_token.startswith("v3."))
+        ):
+            return await records(self, target, page_size, page_token)
+        if page_token and page_token.startswith("v3."):
+            raise BitableError("Base v3 grant changed; restart pagination after authorization.")
         params: dict[str, Any] = {"page_size": page_size}
         if page_token is not None:
             params["page_token"] = page_token

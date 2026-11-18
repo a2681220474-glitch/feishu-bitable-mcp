@@ -1,5 +1,23 @@
 # Changelog
 
+## Granular-scope compatibility and live validation — unreleased
+
+- Add Base v3 reads for actually granted base:record:read when legacy read scopes are
+  absent. Preserve matrices/metadata and bind offset/revision cursors to user/table/view.
+  Keep the existing application/legacy path; never fall back between identities.
+- Accept configured granular read scopes and the live-verified sheets:spreadsheet:write_only
+  alternative, retaining opt-in operation/resource policy and confirmation requirements.
+- Return usable direct URLs and read-policy-filtered table URLs from Wiki resolution.
+- Verify 15 named operations with 18 successful changes on explicitly authorized test
+  resources, using MCP business tools and a private CLI-authenticated transport. Read back
+  data, verify formulas and XLSX preservation. No deletion or app-permission changes.
+- Public HTTP/ChatGPT browser OAuth acceptance remains pending. No original private
+  service, existing tunnel, published release asset or business resource was modified.
+
+See docs/live-validation.md for the exact method and limits. Private links/data stay out
+of Git. Historical release and prior Mock-only validation statements below describe
+their respective snapshots, not this post-rc1 development state.
+
 ## Post-rc1 development — unreleased
 
 - Raise existing transitive dependency floors to dnspython 2.9.2 and opentelemetry-api
