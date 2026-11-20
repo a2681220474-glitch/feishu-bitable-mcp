@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from dataclasses import dataclass, field
@@ -10,6 +11,14 @@ from urllib.parse import parse_qs, urlsplit
 
 class BitableError(Exception):
     """A safe, user-facing error. Never include request headers or raw responses."""
+
+
+GRANULAR_READ_SCOPES = frozenset({
+    "base:app:read", "base:table:read", "base:field:read", "base:record:read",
+    "base:record:retrieve", "base:view:read", "sheets:spreadsheet.meta:read",
+    "sheets:spreadsheet:read", "drive:file:download", "drive:drive.metadata:readonly",
+    "wiki:node:retrieve", "wiki:node:read",
+})
 
 
 @dataclass(frozen=True)
@@ -82,20 +91,102 @@ class Settings:
     enable_writes: bool = False
     read_tables: frozenset[tuple[str, str]] = frozenset()
     write_tables: frozenset[tuple[str, str]] = frozenset()
+    public_url: str = ""
+    identity: str = "app"
+    user_scopes: tuple[str, ...] = (
+        "bitable:app:readonly", "docx:document:readonly", "sheets:spreadsheet:readonly",
+        "drive:drive:readonly", "wiki:wiki:readonly", "offline_access",
+    )
+    resource_urls: tuple[str, ...] = ()
+    enable_changes: bool = False
+    change_policy: dict = field(default_factory=dict, repr=False)
+    change_ledger: str = ".state/operations.sqlite3"
+    excel_overwrite_folder_url: str = ""
+    oauth_enable_cimd: bool = True
 
     def __post_init__(self) -> None:
         if not self.app_id or not self.app_secret:
             raise BitableError("Set FEISHU_APP_ID and FEISHU_APP_SECRET in your local .env.")
-        if self.auth_token and len(self.auth_token) < 32:
-            raise BitableError("MCP_AUTH_TOKEN must contain at least 32 characters.")
+        if self.identity not in {"app", "user"}:
+            raise BitableError("FEISHU_AUTH_MODE must be app or user.")
+        if self.identity == "user":
+            if (
+                not self.public_url or self.auth_token or self.enable_writes
+            ):
+                raise BitableError(
+                    "User mode requires MCP_PUBLIC_URL; disable legacy writes and "
+                    "leave MCP_AUTH_TOKEN empty. Use preview/commit for enabled changes."
+                )
+            allowed = (
+                set(type(self).__dataclass_fields__["user_scopes"].default) | GRANULAR_READ_SCOPES
+            )
+            if self.enable_changes:
+                from .change_policy import WRITE_SCOPES
+
+                allowed.update(WRITE_SCOPES)
+            if not self.user_scopes or not set(self.user_scopes) <= allowed:
+                raise BitableError("FEISHU_USER_SCOPES must use the documented enabled scopes.")
+        if self.enable_changes:
+            from .change_policy import target_key, validate_policy
+
+            if self.enable_writes or (self.identity == "app" and not self.auth_token):
+                raise BitableError(
+                    "Changes require exclusive preview/commit mode; disable legacy writes "
+                    "and configure MCP_AUTH_TOKEN for app identity."
+                )
+            validate_policy(self.change_policy)
+            if self.excel_overwrite_folder_url:
+                target_key(self.excel_overwrite_folder_url, "folder")
+        if self.resource_urls:
+            from .resources import Resource
+
+            for url in self.resource_urls:
+                Resource.parse(url)
+        if self.auth_token and (
+            len(self.auth_token) < 32 or any(c.isspace() for c in self.auth_token)
+        ):
+            raise BitableError("MCP_AUTH_TOKEN needs at least 32 characters without whitespace.")
         if self.enable_writes and (not self.auth_token or not self.write_tables):
             raise BitableError("Writes require MCP_AUTH_TOKEN and exact FEISHU_WRITE_TABLE_URLS.")
+        if self.public_url:
+            try:
+                parts = urlsplit(self.public_url)
+                valid = (
+                    parts.scheme == "https" and bool(parts.hostname)
+                    and parts.username is None and parts.password is None
+                    and parts.port is None and not parts.query and not parts.fragment
+                    and not any(c.isspace() or ord(c) < 32 for c in self.public_url)
+                    and "\\" not in self.public_url and parts.path == "/mcp"
+                )
+            except ValueError:
+                valid = False
+            if not valid:
+                raise BitableError("MCP_PUBLIC_URL must be a complete HTTPS /mcp URL.")
 
     @classmethod
     def from_env(cls) -> Settings:
+        unsupported = (
+            "MCP_GITHUB_CLIENT_ID", "MCP_GITHUB_CLIENT_SECRET", "MCP_GITHUB_ALLOWED_USER_IDS",
+            "MCP_OAUTH_ISSUER", "MCP_OAUTH_JWKS_URL",
+        )
+        if any(os.getenv(key, "").strip() for key in unsupported):
+            raise BitableError(
+                "Unsupported login settings. Use FEISHU_AUTH_MODE=user for Feishu login, "
+                "or app mode with MCP_AUTH_TOKEN."
+            )
         flag = os.getenv("FEISHU_ENABLE_WRITES", "false").lower().strip()
         if flag not in {"true", "false"}:
             raise BitableError("FEISHU_ENABLE_WRITES must be true or false.")
+        changes = os.getenv("FEISHU_ENABLE_CHANGES", "false").strip().lower()
+        if changes not in {"true", "false"}:
+            raise BitableError("FEISHU_ENABLE_CHANGES must be true or false.")
+        cimd = os.getenv("MCP_OAUTH_ENABLE_CIMD", "true").strip().lower()
+        if cimd not in {"true", "false"}:
+            raise BitableError("MCP_OAUTH_ENABLE_CIMD must be true or false.")
+        try:
+            policy = json.loads(os.getenv("FEISHU_CHANGE_ALLOWLIST", "{}"))
+        except ValueError:
+            raise BitableError("FEISHU_CHANGE_ALLOWLIST must be a JSON object.") from None
         return cls(
             app_id=os.getenv("FEISHU_APP_ID", "").strip(),
             app_secret=os.getenv("FEISHU_APP_SECRET", "").strip(),
@@ -103,6 +194,20 @@ class Settings:
             enable_writes=flag == "true",
             read_tables=_targets("FEISHU_READ_TABLE_URLS"),
             write_tables=_targets("FEISHU_WRITE_TABLE_URLS"),
+            public_url=os.getenv("MCP_PUBLIC_URL", "").strip(),
+            identity=os.getenv("FEISHU_AUTH_MODE", "app").strip().lower(),
+            user_scopes=tuple(os.getenv(
+                "FEISHU_USER_SCOPES", " ".join(cls.__dataclass_fields__["user_scopes"].default)
+            ).split()),
+            resource_urls=tuple(
+                url.strip() for url in os.getenv("FEISHU_READ_RESOURCE_URLS", "").split(",")
+                if url.strip()
+            ),
+            enable_changes=changes == "true",
+            change_policy=policy,
+            change_ledger=os.getenv("FEISHU_CHANGE_LEDGER", ".state/operations.sqlite3"),
+            excel_overwrite_folder_url=os.getenv("FEISHU_EXCEL_OVERWRITE_FOLDER_URL", "").strip(),
+            oauth_enable_cimd=cimd == "true",
         )
 
     def authorize(self, target: Target, *, write: bool = False) -> None:

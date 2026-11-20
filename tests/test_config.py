@@ -15,6 +15,16 @@ ENVIRONMENT_KEYS = (
     "FEISHU_ENABLE_WRITES",
     "FEISHU_READ_TABLE_URLS",
     "FEISHU_WRITE_TABLE_URLS",
+    "MCP_OAUTH_ISSUER",
+    "MCP_OAUTH_JWKS_URL",
+    "MCP_PUBLIC_URL",
+    "MCP_GITHUB_CLIENT_ID",
+    "MCP_GITHUB_CLIENT_SECRET",
+    "MCP_GITHUB_ALLOWED_USER_IDS",
+    "FEISHU_AUTH_MODE", "FEISHU_USER_SCOPES", "FEISHU_READ_RESOURCE_URLS",
+    "FEISHU_ENABLE_CHANGES", "FEISHU_CHANGE_ALLOWLIST", "FEISHU_CHANGE_LEDGER",
+    "FEISHU_EXCEL_OVERWRITE_FOLDER_URL",
+    "MCP_OAUTH_ENABLE_CIMD",
 )
 
 
@@ -26,6 +36,18 @@ def configured_env(monkeypatch):
     monkeypatch.setenv("FEISHU_APP_ID", "synthetic-application-id")
     monkeypatch.setenv("FEISHU_APP_SECRET", "synthetic-application-secret")
     return monkeypatch
+
+
+@pytest.mark.parametrize("value,expected", [("true", True), ("false", False)])
+def test_oauth_registration_mode_is_configurable(configured_env, value, expected):
+    configured_env.setenv("MCP_OAUTH_ENABLE_CIMD", value)
+    assert Settings.from_env().oauth_enable_cimd is expected
+
+
+def test_invalid_oauth_registration_flag_fails_closed(configured_env):
+    configured_env.setenv("MCP_OAUTH_ENABLE_CIMD", "disabled")
+    with pytest.raises(BitableError, match="MCP_OAUTH_ENABLE_CIMD"):
+        Settings.from_env()
 
 
 @pytest.mark.parametrize(
@@ -113,11 +135,29 @@ def test_settings_repr_does_not_disclose_credentials():
 def test_writes_are_off_by_default(configured_env):
     settings = Settings.from_env()
     assert settings.enable_writes is False
+    assert settings.enable_changes is False
     assert settings.auth_token == ""
     target = Target.parse(EXAMPLE_URL)
     settings.authorize(target)
     with pytest.raises(BitableError):
         settings.authorize(target, write=True)
+
+
+@pytest.mark.parametrize("flag", ["1", "yes", "on", ""])
+def test_change_opt_in_requires_explicit_boolean(configured_env, flag):
+    configured_env.setenv("FEISHU_ENABLE_CHANGES", flag)
+    with pytest.raises(BitableError, match="FEISHU_ENABLE_CHANGES"):
+        Settings.from_env()
+
+
+@pytest.mark.parametrize("policy", ["[]", "{}", '{"delete_records":["https://example.feishu.cn"]}',
+                                  '{"document.create":[]}', "not-json"])
+def test_change_policy_rejects_empty_unknown_or_malformed(configured_env, policy):
+    configured_env.setenv("FEISHU_ENABLE_CHANGES", "true")
+    configured_env.setenv("MCP_AUTH_TOKEN", AUTH_TOKEN)
+    configured_env.setenv("FEISHU_CHANGE_ALLOWLIST", policy)
+    with pytest.raises(BitableError, match="FEISHU_CHANGE_ALLOWLIST"):
+        Settings.from_env()
 
 
 @pytest.mark.parametrize("missing", ["FEISHU_APP_ID", "FEISHU_APP_SECRET"])

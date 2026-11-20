@@ -80,6 +80,8 @@ async def test_read_catalog_is_minimal_and_annotations_read_only():
             "list_fields",
             "list_records",
             "inspect_table",
+            "resolve_resource", "read_document", "get_spreadsheet_info",
+            "read_spreadsheet", "read_excel_file",
         }
         for tool in tools:
             assert tool.annotations.read_only_hint is True

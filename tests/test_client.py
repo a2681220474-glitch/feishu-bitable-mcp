@@ -202,6 +202,86 @@ async def test_transient_read_can_recover_without_changing_request(mock_client):
     assert len({str(request.url) for request in read_requests}) == 1
 
 
+@pytest.mark.parametrize("exception", [httpx.ReadTimeout, httpx.ConnectError])
+async def test_read_recovers_from_temporary_transport_failure(mock_client, exception):
+    attempts = 0
+
+    def handler(request):
+        nonlocal attempts
+        if is_token(request):
+            return token_response()
+        attempts += 1
+        if attempts == 1:
+            raise exception("fictional transient failure", request=request)
+        return success({"result": "recovered"})
+
+    client, _ = mock_client(handler)
+    assert await client.request("GET", RECORDS_ROUTE) == {"result": "recovered"}
+    assert attempts == 2
+
+
+async def test_response_decode_error_preserves_unknown_write_outcome(mock_client):
+    def handler(request):
+        if is_token(request):
+            return token_response()
+        raise httpx.DecodingError(f"decode failure {APP_SECRET}", request=request)
+
+    client, requests = mock_client(handler)
+    with pytest.raises(BitableError, match="Write outcome is unknown") as error:
+        await client.request("POST", RECORDS_ROUTE)
+    assert APP_SECRET not in str(error.value)
+    assert len(requests) == 2
+
+
+async def test_long_retry_after_does_not_trigger_early_retry(mock_client):
+    def handler(request):
+        return token_response() if is_token(request) else httpx.Response(
+            429, headers={"Retry-After": "60"}, json={"code": 1, "msg": "Try later"}
+        )
+
+    client, requests = mock_client(handler)
+    with pytest.raises(BitableError, match="HTTP 429"):
+        await client.request("GET", RECORDS_ROUTE)
+    assert len(requests) == 2
+
+
+async def test_request_attempt_deadline_bounds_a_slow_transport(mock_client, monkeypatch):
+    monkeypatch.setattr(client_module, "ATTEMPT_TIMEOUT", .01)
+    monkeypatch.setattr(client_module.random, "uniform", lambda *_: 0)
+
+    async def handler(request):
+        if is_token(request):
+            return token_response()
+        await asyncio.sleep(1)
+        return success({})
+
+    client, requests = mock_client(handler)
+    with pytest.raises(BitableError, match="timed out"):
+        await client.request("GET", RECORDS_ROUTE)
+    assert len(requests) == 4
+
+
+async def test_inflight_read_concurrency_is_bounded(mock_client):
+    active = 0
+    peak = 0
+
+    async def handler(request):
+        nonlocal active, peak
+        if is_token(request):
+            return token_response()
+        active += 1
+        peak = max(peak, active)
+        try:
+            await asyncio.sleep(.01)
+            return success({})
+        finally:
+            active -= 1
+
+    client, _ = mock_client(handler)
+    await asyncio.gather(*(client.request("GET", RECORDS_ROUTE) for _ in range(12)))
+    assert peak == 4
+
+
 @pytest.mark.parametrize("method", ["GET", "POST"])
 @pytest.mark.parametrize("exception", [httpx.ReadTimeout, httpx.ConnectError])
 async def test_transport_failures_do_not_leak_details_or_duplicate_writes(
@@ -219,7 +299,7 @@ async def test_transport_failures_do_not_leak_details_or_duplicate_writes(
         await client.request(method, RECORDS_ROUTE)
     assert APP_SECRET not in str(error.value)
     assert ("Write outcome is unknown" in str(error.value)) == (method == "POST")
-    assert sum(not is_token(request) for request in requests) == 1
+    assert sum(not is_token(request) for request in requests) == (3 if method == "GET" else 1)
 
 
 @pytest.mark.parametrize("body", [b"not json", b"[]", b"null"])

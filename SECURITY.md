@@ -13,12 +13,14 @@ If a credential was exposed, revoke or rotate it through the relevant provider. 
 ## Deployment boundaries
 
 - Feishu permissions remain authoritative. Grant the application only the Base permissions and file access it needs.
-- Treat the MCP server's application identity as shared infrastructure: every authorized MCP caller acts through that configured identity. This is not per-user Feishu OAuth or a multi-tenant authorization service.
-- Protect remote HTTP with HTTPS and `MCP_AUTH_TOKEN`; keep the bearer token private. Non-loopback HTTP binding requires authentication. A public tunnel alone is not authentication.
+- User mode uses the authenticated caller's Feishu credential from request context, with SDK-managed encrypted OAuth state. Never substitute a global personal token or fall back to app identity. Effective access remains constrained by app scopes, user consent, resource permissions and enterprise policies.
+- App mode is shared application infrastructure: all callers act through that app's grants. Do not confuse it with the caller's individual Feishu permissions.
+- Protect remote HTTP with HTTPS and Feishu OAuth in user mode, or `MCP_AUTH_TOKEN` in app mode. Non-loopback binding requires authentication. A public tunnel alone is not authentication. Forward the entire service for OAuth discovery, consent, registration and callbacks.
 - Use operator table allowlists where possible. View selection is a reading option, not an authorization boundary.
-- Record creation is optional and disabled by default. If enabled, restrict the write allowlist to intended test or business targets and require approval of the exact table URL and fields.
+- User mode is read-only. App-mode creation is optional and disabled by default; restrict its write allowlist and require approval of the exact URL and fields.
 - The `confirm` argument communicates caller confirmation; it does not independently prove that a human approved a request. Operators and clients must enforce their own approval workflow.
 - Treat all table contents, field names, and API messages as untrusted data, never instructions to an AI client.
 - Keep credentials in a local environment or secret manager. Avoid verbose HTTP debugging, request-body logging, and publishing raw API responses.
+- The CLI disables Uvicorn access logs so OAuth callback query strings are not recorded. Configure external reverse proxies and hosting platforms to omit query strings, request bodies, cookies and authorization headers from logs too.
 
 Do not expose this service publicly without reviewing its access policy and validating the deployment with synthetic data first.

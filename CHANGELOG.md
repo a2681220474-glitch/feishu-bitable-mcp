@@ -1,5 +1,78 @@
 # Changelog
 
+## Base and Wiki entrypoints — unreleased
+
+- Accept bare Base roots and Wiki Base links in Bitable read tools. List accessible
+  tables when selection is needed; only a single visible table may be selected for reads.
+- Preserve validated table/view parameters through Wiki resolution and reject duplicate
+  or malformed identifiers before requesting data.
+- Resolve Wiki mutation targets before checking the exact direct-resource write policy.
+  Never choose a write table implicitly; preview, actual-grant checks and durable receipts remain required.
+- Exercise document, Sheets, Base/Wiki discovery, explicit-table records and Drive XLSX
+  against authorized test resources with a private CLI transport. Browser OAuth acceptance
+  remains separate; no production resource is used for validation.
+- Add an explicit DCR-only deployment option for proxy/fake-DNS environments where
+  SDK SSRF checks reject CIMD metadata fetching. Keep CIMD enabled by default and retain
+  PKCE, consent, redirect restrictions and all SDK network protections.
+
+## Granular-scope compatibility and live validation — unreleased
+
+- Add Base v3 reads for actually granted base:record:read when legacy read scopes are
+  absent. Preserve matrices/metadata and bind offset/revision cursors to user/table/view.
+  Keep the existing application/legacy path; never fall back between identities.
+- Accept configured granular read scopes and the live-verified sheets:spreadsheet:write_only
+  alternative, retaining opt-in operation/resource policy and confirmation requirements.
+- Return usable direct URLs and read-policy-filtered table URLs from Wiki resolution.
+- Verify 15 named operations with 18 successful changes on explicitly authorized test
+  resources, using MCP business tools and a private CLI-authenticated transport. Read back
+  data, verify formulas and XLSX preservation. No deletion or app-permission changes.
+- Public HTTP/ChatGPT browser OAuth acceptance remains pending. No original private
+  service, existing tunnel, published release asset or business resource was modified.
+
+See docs/live-validation.md for the exact method and limits. Private links/data stay out
+of Git. Historical release and prior Mock-only validation statements below describe
+their respective snapshots, not this post-rc1 development state.
+
+## Post-rc1 development — unreleased
+
+- Raise existing transitive dependency floors to dnspython 2.9.2 and opentelemetry-api
+  1.45.2, regenerate hashes, and protect both locked and ordinary installs against
+  [CVE-2026-128089](https://github.com/rthalley/dnspython/security/advisories/GHSA-vvf4-9x63-8xvv)
+  and [CVE-2026-126360](https://github.com/open-telemetry/opentelemetry-python/security/advisories/GHSA-mf5v-w3w3-f6cg).
+- Add opt-in named changes across Bitable, Docx, online Sheets and Drive XLSX through
+  prepare_change / commit_change / get_change_status. Existing read-only defaults stay intact.
+- Separate operation/resource allowlists and actual user-granted scopes; do not infer
+  write grants from requested configuration or fall back to application credentials.
+- Persist single-dispatch receipts and resource leases in private SQLite storage, bind
+  previews to actor/content/expiry, check optimistic snapshots, and hold uncertain outcomes.
+- Add offline operator reconciliation without making old request IDs retryable.
+- Bound batch sizes, cells and basic styles; insert rows explicitly for Sheets append.
+  Preserve unrelated OOXML parts during XLSX edits and refuse unsupported workbooks.
+- Keep same-token XLSX overwrite experimental and separately gated; the transport follows
+  official CLI source, with no claim of verified Drive version-history behavior.
+
+Only synthetic transport/OAuth/workbook tests have run. No live Feishu resource or app
+configuration was modified. Strict atomic CAS, complex document blocks and full Base
+reconstruction remain unsupported. See docs/changes.md for exact payloads and limitations.
+
+## 0.2.0 development candidate — unreleased
+
+- Add Feishu personal OAuth via the SDK proxy, with consent, PKCE, encrypted state,
+  refresh and reauthorization. Per-request user credentials never fall back to app identity.
+- Add --setup with hidden secret input and exclusive private config creation; preserve
+  --env-file, --doctor, existing application mode and opt-in guarded record creation.
+- Add read_document, get_spreadsheet_info, read_spreadsheet, read_excel_file and
+  resolve_resource for docx, online Sheets, uploaded .xlsx and Wiki resolution.
+- Preserve raw document blocks and record pages, use explicit cell windows and Excel row
+  cursors, reject oversized/encrypted/macro workbooks, and never execute formulas.
+- Add safe read transport retries, concurrency and attempt deadlines, FastMCP 4.1.6 with
+  a synchronized hash lock, and macOS/Windows onboarding CI.
+- Update three-language readmes and deployment/authentication guidance.
+
+Validation uses synthetic data, including the complete OAuth flow, refresh, revocation,
+concurrent user isolation, new read tools and workbook parsing. Real Feishu/ChatGPT
+browser acceptance is pending. No real resource is created or modified during development.
+
 ## 0.1.1 — 2026-11-06
 
 - Redact credentials used by each in-flight request, including both attempts of a refreshed read, even when concurrent calls replace the cached tenant token. Credentials are retained only for that request, not in an accumulating token history.
