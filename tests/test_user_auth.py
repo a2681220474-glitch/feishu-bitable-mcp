@@ -24,13 +24,15 @@ from feishu_bitable_mcp.user_auth import (
 
 
 @pytest.mark.parametrize("granted_scope", [None, "bitable:app:readonly", "base:record:create"])
+@pytest.mark.parametrize("cimd_enabled", [True, False])
 async def test_complete_synthetic_oauth_consent_code_pkce_and_mcp_read(
-    monkeypatch, tmp_path, granted_scope
+    monkeypatch, tmp_path, granted_scope, cimd_enabled
 ):
     from feishu_bitable_mcp import server
 
     target = "https://example.feishu.cn/base/DemoBaseToken0001?table=tblDemoTable01"
     policy = settings(
+        oauth_enable_cimd=cimd_enabled,
         enable_changes=True,
         change_policy={"bitable.create_records": [target]},
         change_ledger=str(tmp_path / "receipts.db"),
@@ -103,6 +105,10 @@ async def test_complete_synthetic_oauth_consent_code_pkce_and_mcp_read(
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app), base_url="https://mcp.example.com"
         ) as browser:
+            metadata = (await browser.get("/.well-known/oauth-authorization-server")).json()
+            assert bool(metadata.get("client_id_metadata_document_supported")) is cimd_enabled
+            assert metadata["registration_endpoint"].endswith("/register")
+            assert "S256" in metadata["code_challenge_methods_supported"]
             registration = await browser.post(
                 "/register",
                 json={

@@ -76,8 +76,12 @@ user 模式的 doctor 只做本地检查并提示浏览器登录，不证明真�
 - 权限不足：保留脱敏的 HTTP 状态/code/msg，核对 app scope、用户授权、应用可用范围和文件权限。
 - 401：检查是否登录，不要通过关闭认证排查业务接口。
 - 端口占用：选其他端口并同步代理目标，不要结束来源不明的服务。
+- `Client Not Registered`：先检查服务端脱敏日志。若 CIMD 声明读取被安全检查拒绝，且系统代理把公网域名解析成保留/fake IP，可在私有配置设置 `MCP_OAUTH_ENABLE_CIMD=false`，重启后在 ChatGPT 高级 OAuth 设置选择动态客户端注册（DCR）。不要关闭 TLS 或 SDK 的 SSRF 检查。已有插件可能保存旧注册方式，需要用 DCR 重新配置连接；不是反复重试旧声明就能解决。
 - `.xls`、加密文件、宏工作簿：另存为普通 `.xlsx`；本项目不运行公式或宏。
 
 OAuth 状态由 SDK 存到系统用户数据目录，用从 App Secret 派生的密钥加密。保留配置和状态目录以维持重启后的登录；轮换 Secret 后需重新授权。不要公开该目录、`.env`、token、业务文件或截图。
+
+`MCP_OAUTH_ENABLE_CIMD` 默认开启；关闭时只改变客户端注册方式，仍保留标准 DCR、PKCE、同意页和回调限制。
+ChatGPT 官方支持 CIMD、DCR 和预注册客户端，见[认证与客户端注册说明](https://developers.openai.com/plugins/build/auth)。
 
 官方接口：[文档块](https://open.feishu.cn/document/server-docs/docs/docs/docx-v1/document/list)、[工作表](https://open.feishu.cn/document/server-docs/docs/sheets-v3/spreadsheet-sheet/query)、[文件下载](https://open.feishu.cn/document/server-docs/drive-v1/file/download)、[用户令牌](https://open.feishu.cn/document/authentication-management/access-token/get-user-access-token)。

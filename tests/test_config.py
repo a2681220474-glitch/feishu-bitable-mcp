@@ -24,6 +24,7 @@ ENVIRONMENT_KEYS = (
     "FEISHU_AUTH_MODE", "FEISHU_USER_SCOPES", "FEISHU_READ_RESOURCE_URLS",
     "FEISHU_ENABLE_CHANGES", "FEISHU_CHANGE_ALLOWLIST", "FEISHU_CHANGE_LEDGER",
     "FEISHU_EXCEL_OVERWRITE_FOLDER_URL",
+    "MCP_OAUTH_ENABLE_CIMD",
 )
 
 
@@ -35,6 +36,18 @@ def configured_env(monkeypatch):
     monkeypatch.setenv("FEISHU_APP_ID", "synthetic-application-id")
     monkeypatch.setenv("FEISHU_APP_SECRET", "synthetic-application-secret")
     return monkeypatch
+
+
+@pytest.mark.parametrize("value,expected", [("true", True), ("false", False)])
+def test_oauth_registration_mode_is_configurable(configured_env, value, expected):
+    configured_env.setenv("MCP_OAUTH_ENABLE_CIMD", value)
+    assert Settings.from_env().oauth_enable_cimd is expected
+
+
+def test_invalid_oauth_registration_flag_fails_closed(configured_env):
+    configured_env.setenv("MCP_OAUTH_ENABLE_CIMD", "disabled")
+    with pytest.raises(BitableError, match="MCP_OAUTH_ENABLE_CIMD"):
+        Settings.from_env()
 
 
 @pytest.mark.parametrize(

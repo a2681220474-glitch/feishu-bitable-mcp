@@ -102,6 +102,7 @@ class Settings:
     change_policy: dict = field(default_factory=dict, repr=False)
     change_ledger: str = ".state/operations.sqlite3"
     excel_overwrite_folder_url: str = ""
+    oauth_enable_cimd: bool = True
 
     def __post_init__(self) -> None:
         if not self.app_id or not self.app_secret:
@@ -179,6 +180,9 @@ class Settings:
         changes = os.getenv("FEISHU_ENABLE_CHANGES", "false").strip().lower()
         if changes not in {"true", "false"}:
             raise BitableError("FEISHU_ENABLE_CHANGES must be true or false.")
+        cimd = os.getenv("MCP_OAUTH_ENABLE_CIMD", "true").strip().lower()
+        if cimd not in {"true", "false"}:
+            raise BitableError("MCP_OAUTH_ENABLE_CIMD must be true or false.")
         try:
             policy = json.loads(os.getenv("FEISHU_CHANGE_ALLOWLIST", "{}"))
         except ValueError:
@@ -203,6 +207,7 @@ class Settings:
             change_policy=policy,
             change_ledger=os.getenv("FEISHU_CHANGE_LEDGER", ".state/operations.sqlite3"),
             excel_overwrite_folder_url=os.getenv("FEISHU_EXCEL_OVERWRITE_FOLDER_URL", "").strip(),
+            oauth_enable_cimd=cimd == "true",
         )
 
     def authorize(self, target: Target, *, write: bool = False) -> None:

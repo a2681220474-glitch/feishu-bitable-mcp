@@ -1,5 +1,20 @@
 # Changelog
 
+## Base and Wiki entrypoints — unreleased
+
+- Accept bare Base roots and Wiki Base links in Bitable read tools. List accessible
+  tables when selection is needed; only a single visible table may be selected for reads.
+- Preserve validated table/view parameters through Wiki resolution and reject duplicate
+  or malformed identifiers before requesting data.
+- Resolve Wiki mutation targets before checking the exact direct-resource write policy.
+  Never choose a write table implicitly; preview, actual-grant checks and durable receipts remain required.
+- Exercise document, Sheets, Base/Wiki discovery, explicit-table records and Drive XLSX
+  against authorized test resources with a private CLI transport. Browser OAuth acceptance
+  remains separate; no production resource is used for validation.
+- Add an explicit DCR-only deployment option for proxy/fake-DNS environments where
+  SDK SSRF checks reject CIMD metadata fetching. Keep CIMD enabled by default and retain
+  PKCE, consent, redirect restrictions and all SDK network protections.
+
 ## Granular-scope compatibility and live validation — unreleased
 
 - Add Base v3 reads for actually granted base:record:read when legacy read scopes are

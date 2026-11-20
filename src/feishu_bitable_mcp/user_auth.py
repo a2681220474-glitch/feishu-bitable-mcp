@@ -125,6 +125,7 @@ class FeishuProvider(OAuthProxy):
             forward_resource=False,
             require_authorization_consent=True,
             allowed_client_redirect_uris=["https://chatgpt.com/*"],
+            enable_cimd=settings.oauth_enable_cimd,
         )
         self.update_default_scopes(list(settings.user_scopes))
 

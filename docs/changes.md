@@ -30,7 +30,10 @@ FEISHU_USER_SCOPES=bitable:app:readonly base:record:create docx:document:readonl
 旧模式没有本页的持久回执保证；新部署推荐使用新流程，保持兼容开关关闭。
 
 URL 的域名与路径严格检查，请求始终发到固定飞书 API，不抓取 URL 本身。
-新增/修改仅接受直接 `/base/`、`/docx/`、`/sheets/`、`/file/` 和 `/drive/folder/` URL；不沿 Wiki 间接授权写入。
+新增/修改使用 `/base/`、`/docx/`、`/sheets/`、`/file/` 和 `/drive/folder/` 目标。
+工具也接受指向现有资源的 Wiki 链接：先只读解析，再按实际类型检查对应的**直接目标白名单**；Wiki 本身不会授予写权限。
+Base/Wiki Base 没有 `table=` 时先返回数据表列表，不自动选写入目标，即使只有一张表也需要明确选定。
+预览返回解析后的准确 `target_url`；确认、回执和提交继续绑定该目标，而不是易变的 Wiki 别名。
 表的 `view` 不构成写入权限边界；写入对象仍是数据表。在线表格白名单带 `sheet=` 时，调用参数不能跳到另一工作表。
 创建 Base/文档/在线表格/Excel 必须明确授权其目标文件夹；新资源不会自动加入修改白名单。
 

@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, quote, urlsplit
 import httpx
 
 from .client import FeishuClient
-from .config import BitableError
+from .config import BitableError, Target
 
 MAX_DOWNLOAD = 20 * 1024 * 1024
 
@@ -20,6 +20,8 @@ class Resource:
     kind: str
     token: str
     sheet_id: str | None = None
+    table_id: str | None = None
+    view_id: str | None = None
 
     @classmethod
     def parse(cls, url: str):
@@ -29,23 +31,40 @@ class Resource:
             parts = urlsplit(url)
             query = parse_qs(parts.query, keep_blank_values=True, max_num_fields=30)
             match = re.fullmatch(
-                r"/(docx|sheets|wiki|file|drive/file)/([A-Za-z0-9]{10,100})/?", parts.path
+                r"/(base|docx|sheets|wiki|file|drive/file)/([A-Za-z0-9]{10,100})/?", parts.path
             )
             valid = (
                 parts.scheme == "https" and match is not None
-                and re.fullmatch(r"(?:[a-z0-9-]+\.)*feishu\.cn", parts.hostname or "")
+                and re.fullmatch(
+                    r"(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)*feishu\.cn",
+                    parts.hostname or "",
+                )
                 and parts.username is None and parts.password is None and parts.port is None
                 and not parts.fragment and "\\" not in url and "\x7f" not in url
             )
         except ValueError:
             valid = False
         if not valid or match is None:
-            raise BitableError("Accept HTTPS Feishu /docx/, /sheets/, /wiki/ or /file/ links.")
+            raise BitableError(
+                "Accept HTTPS Feishu /base/, /docx/, /sheets/, /wiki/ or /file/ links."
+            )
         sheets = query.get("sheet", [])
         if sheets and (len(sheets) != 1 or not re.fullmatch(r"[A-Za-z0-9]{1,100}", sheets[0])):
             raise BitableError("URL contains an invalid or duplicate sheet parameter.")
-        kind = "file" if match[1] == "drive/file" else match[1]
-        return cls(kind, match[2], sheets[0] if sheets else None)
+        def identifier(name, pattern):
+            values = query.get(name, [])
+            if values and (len(values) != 1 or not re.fullmatch(pattern, values[0])):
+                raise BitableError(f"URL contains an invalid or duplicate {name} parameter.")
+            return values[0] if values else None
+
+        table_id = identifier("table", r"tbl[A-Za-z0-9]{7,100}")
+        view_id = identifier("view", r"vew[A-Za-z0-9]{7,100}")
+        if (table_id or view_id) and match[1] not in {"base", "wiki"}:
+            raise BitableError("table/view parameters require a Base or Wiki Base URL.")
+        if view_id and not table_id:
+            raise BitableError("A view parameter requires an explicit table parameter.")
+        kind = {"drive/file": "file", "base": "bitable"}.get(match[1], match[1])
+        return cls(kind, match[2], sheets[0] if sheets else None, table_id, view_id)
 
 
 class ResourceClient:
@@ -70,11 +89,18 @@ class ResourceClient:
             kind = {"sheet": "sheets"}.get(kind, kind)
             if kind not in {"docx", "sheets", "file", "bitable"}:
                 raise BitableError("This Wiki resource type is not supported.")
-            resource = Resource(kind, token, resource.sheet_id)
+            if (resource.table_id or resource.view_id) and kind != "bitable":
+                raise BitableError("table/view parameters require a Wiki pointing to a Base.")
+            resource = Resource(
+                kind, token, resource.sheet_id, resource.table_id, resource.view_id,
+            )
         return resource
 
     async def describe(self, url: str):
         resource = await self.resolve(url)
+        return await self._describe(url, resource)
+
+    async def _describe(self, url: str, resource: Resource):
         route_kind = "base" if resource.kind == "bitable" else resource.kind
         direct = f"https://{urlsplit(url).hostname}/{route_kind}/{resource.token}"
         if resource.kind == "sheets" and resource.sheet_id:
@@ -98,7 +124,35 @@ class ResourceClient:
                 if not allowed or (resource.token, table_id) in allowed:
                     visible.append({**table, "url": direct + "?table=" + table_id})
             result["tables"] = visible
+            result["table_count"] = len(visible)
+            if resource.table_id:
+                selected = Target(resource.token, resource.table_id, resource.view_id)
+                self.api.settings.authorize(selected)
+                result.update(selected.identifiers())
+                result["resource_url"] = direct + "?table=" + resource.table_id
+                if resource.view_id:
+                    result["resource_url"] += "&view=" + resource.view_id
         return result
+
+    async def bitable_target(self, url: str, *, auto_select: bool = True):
+        """Discover tables for a Base root; never silently choose among multiple tables."""
+        resource = await self.resolve(url)
+        if resource.kind != "bitable":
+            raise BitableError("This read tool requires a Base or Wiki pointing to a Base.")
+        if resource.table_id:
+            target = Target(resource.token, resource.table_id, resource.view_id)
+            self.api.settings.authorize(target)
+            return target
+        discovery = await self._describe(url, resource)
+        tables = discovery["tables"]
+        if auto_select and len(tables) == 1:
+            return Target(resource.token, tables[0]["table_id"])
+        return {
+            **discovery,
+            "selection_required": True,
+            "message": "Choose the intended table from tables and reuse its URL. "
+            "No records have been read or modified.",
+        }
 
     async def document(self, url: str, page_size: int, page_token: str | None):
         resource = await self.resolve(url)

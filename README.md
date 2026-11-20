@@ -49,7 +49,8 @@
 | `commit_change` | `plan_id, confirmation_digest, confirm=false` | 新模式确认后一次派发，失败或超时保留持久回执 |
 | `get_change_status` | `request_id` | 查询当前身份的操作状态，避免不确定结果重复创建 |
 
-- Base 工具接受 `https://*.feishu.cn/base/<app_token>?table=<table_id>`，`view` 可选。新增工具接受 `/docx/`、`/sheets/`、`/file/`、`/drive/file/` 和指向相应资源的 `/wiki/` 链接。Wiki Base 可先解析类型与 token，再使用带 table 的标准 Base URL。不支持短链接、BaseApp 和 Lark 国际版。
+- Base 工具接受 `/base/` 首页和指向多维表格的 `/wiki/` 链接。没有 `table=` 时列出可访问的数据表；只有一张可见表时读取可直接继续，多张表需要明确选择。带 `table=` 的 Wiki 链接会保留选表与可选 `view=`；视图参数须同时指定表。写入始终要求明确选表、实际目标白名单和预览确认。
+- 文档、在线表格、云盘 Excel 工具接受 `/docx/`、`/sheets/`、`/file/`、`/drive/file/` 及指向对应资源的 `/wiki/`。Wiki 是入口，实际资源类型由飞书返回；不能把个人文档库或云盘位置当作资源类型。不支持短链接、BaseApp 和 Lark 国际版。
 - 服务只从 URL 提取 ID，API 请求目的地固定为 `open.feishu.cn`。
 - 读取指定视图时转发 `view_id`。实际筛选、排序和可见字段行为取决于飞书 API，
   这里仅有参数转发测试，不能将视图当成权限隔离边界。`total` 保留上游含义，未保证是视图筛选后的数量。

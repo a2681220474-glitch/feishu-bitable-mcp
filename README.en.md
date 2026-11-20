@@ -26,6 +26,13 @@ In user mode, ChatGPT starts a Feishu OAuth login through the SDK proxy. Each re
 | read_spreadsheet | Explicit rectangle, up to 5000 cells; value/formula rendering |
 | read_excel_file | Uploaded Drive .xlsx worksheet values/types/formats and row cursor |
 
+Bitable read tools accept bare `/base/` roots and Wiki links pointing to Bases.
+Without `table=`, they return accessible table URLs; reads may continue automatically only
+when one table is visible. Wiki `table=`/`view=` selections are preserved and validated.
+Wiki links can also point to documents, spreadsheets or files: location is not resource type.
+Mutation previews resolve aliases but still require an explicit table and an exact canonical
+target allowlist, actual write scopes and user confirmation.
+
 App identity remains available. Legacy create_record stays app-only and cannot be combined with the new preview/commit mode. The development branch adds bounded Bitable batch create/update and basic schema creation, Docx creation/text insertion/replacement, online Sheets creation/worksheet/value/formula/append/basic formatting, and XLSX creation or restricted cell edits. Experimental same-token XLSX overwrite needs extra operator setup. No deletion tools or arbitrary API forwarding. Complex blocks, advanced field writes, complete reconstruction and atomic concurrency guarantees are outside the implemented scope.
 
 ## Install and connect
